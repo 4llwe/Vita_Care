@@ -9,6 +9,7 @@ import {
   HaHEpisodeStatus,
   HaHVisitStatus,
   MedicationOrderStatus,
+  Prisma,
 } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { NotificationService } from "../notification/notification.service";
@@ -96,8 +97,8 @@ export class HaHService {
       data: {
         version: (latest._max.version ?? 0) + 1,
         name: dto.name,
-        thresholds: dto.thresholds,
-        responseSla: dto.responseSla,
+        thresholds: dto.thresholds as Prisma.InputJsonValue,
+        responseSla: dto.responseSla as Prisma.InputJsonValue,
         status: "PENDING_APPROVAL",
         approvedById: actorId,
         approvalNote: dto.approvalNote,
@@ -262,7 +263,7 @@ export class HaHService {
   async assessEligibility(id: string, dto: AssessEligibilityDto, actorId: string) {
     const episode = await this.requireEpisode(id);
     if (
-      ![HaHEpisodeStatus.SCREENING, HaHEpisodeStatus.INELIGIBLE].includes(episode.status)
+      !([HaHEpisodeStatus.SCREENING, HaHEpisodeStatus.INELIGIBLE] as HaHEpisodeStatus[]).includes(episode.status)
     ) {
       throw new BadRequestException(
         "Eligibility hanya dapat dinilai pada tahap screening",
@@ -283,7 +284,7 @@ export class HaHService {
     if (!dto.reliableCommunication) exclusions.push("Komunikasi darurat tidak andal");
     if (!dto.patientConsents) exclusions.push("Pasien tidak memberikan persetujuan");
 
-    let decision = exclusions.length
+    let decision: HaHEligibilityDecision = exclusions.length
       ? HaHEligibilityDecision.INELIGIBLE
       : HaHEligibilityDecision.ELIGIBLE;
     if (dto.clinicianOverride) {
@@ -341,10 +342,12 @@ export class HaHService {
       throw new BadRequestException("Episode belum dinyatakan eligible");
     if (
       !episode.eligibility ||
-      ![
-        HaHEligibilityDecision.ELIGIBLE,
-        HaHEligibilityDecision.OVERRIDE_ELIGIBLE,
-      ].includes(episode.eligibility.decision)
+      !(
+        [
+          HaHEligibilityDecision.ELIGIBLE,
+          HaHEligibilityDecision.OVERRIDE_ELIGIBLE,
+        ] as HaHEligibilityDecision[]
+      ).includes(episode.eligibility.decision)
     ) {
       throw new BadRequestException("Assessment eligibility yang sah diperlukan");
     }
@@ -363,7 +366,7 @@ export class HaHService {
 
   async upsertCarePlan(id: string, dto: CarePlanDto, actorId: string) {
     const e = await this.requireEpisode(id);
-    if (![HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE].includes(e.status))
+    if (!([HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]).includes(e.status))
       throw new BadRequestException("Care plan memerlukan episode admitted/active");
     const plan = await this.prisma.haHCarePlan.upsert({
       where: { episodeId: id },
@@ -401,7 +404,7 @@ export class HaHService {
 
   async recordObservation(id: string, dto: RecordObservationDto, actorId: string) {
     const e = await this.requireEpisode(id);
-    if (![HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE].includes(e.status))
+    if (!([HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]).includes(e.status))
       throw new BadRequestException("Observasi hanya untuk episode admitted/active");
     if (dto.spo2Scale === 2 && !dto.symptomNotes?.toLowerCase().includes("hypercap")) {
       throw new BadRequestException(
@@ -488,7 +491,7 @@ export class HaHService {
 
   async transfer(id: string, dto: TransferDto, actorId: string) {
     const e = await this.requireEpisode(id);
-    if (![HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE].includes(e.status))
+    if (!([HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]).includes(e.status))
       throw new BadRequestException("Episode tidak aktif");
     const [, transfer] = await this.prisma.$transaction([
       this.prisma.haHEpisode.update({
@@ -534,7 +537,7 @@ export class HaHService {
       throw new BadRequestException(
         `Selesaikan ${openAlerts} alert klinis sebelum discharge`,
       );
-    if (![HaHEpisodeStatus.ACTIVE, HaHEpisodeStatus.TRANSFERRED].includes(e.status))
+    if (!([HaHEpisodeStatus.ACTIVE, HaHEpisodeStatus.TRANSFERRED] as HaHEpisodeStatus[]).includes(e.status))
       throw new BadRequestException("Episode belum dapat didischarge");
     return this.prisma.haHEpisode.update({
       where: { id },
@@ -553,7 +556,7 @@ export class HaHService {
     actorId: string,
   ) {
     const e = await this.requireEpisode(id);
-    if (![HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE].includes(e.status))
+    if (!([HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]).includes(e.status))
       throw new BadRequestException("Order diagnostik memerlukan episode aktif");
     return this.prisma.haHDiagnosticOrder.create({
       data: { episodeId: id, ...dto, orderedById: actorId },
@@ -612,7 +615,7 @@ export class HaHService {
 
   async assignEquipment(id: string, dto: CreateEquipmentAssignmentDto, actorId: string) {
     const e = await this.requireEpisode(id);
-    if (![HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE].includes(e.status))
+    if (!([HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]).includes(e.status))
       throw new BadRequestException("Alat hanya dapat ditugaskan ke episode aktif");
     return this.prisma.haHEquipmentAssignment.create({
       data: { episodeId: id, ...dto, requestedById: actorId },
@@ -660,7 +663,7 @@ export class HaHService {
     actorId: string,
   ) {
     const episode = await this.getEpisode(id);
-    if (![HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE].includes(episode.status))
+    if (!([HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]).includes(episode.status))
       throw new BadRequestException(
         "Medication order memerlukan episode admitted/active",
       );
@@ -737,7 +740,7 @@ export class HaHService {
 
   async createVisit(id: string, dto: CreateVisitDto) {
     const episode = await this.requireEpisode(id);
-    if (![HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE].includes(episode.status))
+    if (!([HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]).includes(episode.status))
       throw new BadRequestException(
         "Kunjungan hanya dapat dijadwalkan untuk episode admitted/active",
       );
@@ -906,6 +909,16 @@ export class HaHService {
         attachmentUrls: dto.attachmentUrls ?? [],
       },
       include: { sender: { select: { id: true, name: true, role: true } } },
+    });
+  }
+
+  markMessageRead(messageId: string) {
+    return this.prisma.haHClinicalMessage.update({
+      where: { id: messageId },
+      data: { readAt: new Date() },
+      include: {
+        sender: { select: { id: true, name: true, role: true } },
+      },
     });
   }
 

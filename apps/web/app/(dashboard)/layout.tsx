@@ -13,10 +13,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="mx-auto flex max-w-[1500px] items-center justify-between px-4 py-3 lg:px-6">
             <Link href="/dashboard">
               <span className="font-black tracking-tight text-slate-950">
-                Vita Care <span className="text-teal-700">HaH</span>
+                Vita Care <span className="text-teal-700">Hospital At Home</span>
               </span>
               <span className="hidden text-[10px] font-bold uppercase tracking-[.16em] text-slate-400 sm:block">
-                Clinical operations
+                Mataram · Lombok · Clinical operations
               </span>
             </Link>
             <div className="flex items-center gap-3">

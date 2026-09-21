@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 const label: Record<string, string> = {
   dashboard: "Dashboard",
-  hah: "Hospital at Home",
+  hah: "Vita Care Hospital At Home",
   monitoring: "Monitoring Pasien",
   workspace: "Ruang Kerja",
   bookings: "Pemesanan",

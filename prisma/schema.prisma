@@ -749,6 +749,8 @@ model HaHClinicalProtocol {
   activeFrom DateTime?
   retiredAt DateTime?
   createdAt DateTime @default(now())
+  approvals HaHClinicalProtocolApproval[]
+
   @@index([status, activeFrom])
 }
 

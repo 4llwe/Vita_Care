@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 const actions = [
-  ["Hubungi Tim Medis", "NEXT_PUBLIC_MEDICAL_TEAM_PHONE"],
+  ["Hubungi Tim Medis Vita Care", "NEXT_PUBLIC_MEDICAL_TEAM_PHONE"],
   ["Hubungi Rumah Sakit", "NEXT_PUBLIC_HOSPITAL_PHONE"],
   ["Panggil Ambulans", "NEXT_PUBLIC_AMBULANCE_PHONE"],
 ] as const;
@@ -64,8 +64,7 @@ export function EmergencyButton({ compact = false }: { compact?: boolean }) {
         aria-label="Buka bantuan darurat"
         aria-haspopup="dialog"
       >
-        <span aria-hidden>!</span>
-        {compact ? "SOS" : "DARURAT"}
+        {compact ? "🚨" : "🚨 DARURAT"}
       </button>
       {open && (
         <div
@@ -87,7 +86,7 @@ export function EmergencyButton({ compact = false }: { compact?: boolean }) {
                   id="emergency-title"
                   className="mt-1 text-2xl font-extrabold text-slate-950"
                 >
-                  Bantuan Darurat
+                  KONDISI DARURAT?
                 </h2>
               </div>
               <button
@@ -133,7 +132,7 @@ export function EmergencyButton({ compact = false }: { compact?: boolean }) {
                 onClick={location ? shareLocation : locate}
                 className="min-h-20 rounded-2xl border p-4 text-left text-sm font-bold text-slate-700"
               >
-                Lokasi pasien
+                Bagikan Lokasi Pasien
                 <span className="mt-1 block break-all text-xs font-medium text-slate-500">
                   {location || "Ambil dan bagikan koordinat"}
                 </span>
@@ -143,7 +142,7 @@ export function EmergencyButton({ compact = false }: { compact?: boolean }) {
                 onClick={close}
                 className="min-h-20 rounded-2xl border p-4 text-sm font-bold text-slate-700"
               >
-                Ringkasan medis
+                Tampilkan Ringkasan Medis
                 <span className="mt-1 block text-xs font-medium text-slate-500">
                   Diagnosis, obat, alergi, dan alert
                 </span>
@@ -153,7 +152,7 @@ export function EmergencyButton({ compact = false }: { compact?: boolean }) {
                 onClick={close}
                 className="col-span-2 min-h-16 rounded-2xl border p-4 text-sm font-bold text-slate-700"
               >
-                Kontak keluarga
+                Hubungi Keluarga
                 <span className="mt-1 block text-xs font-medium text-slate-500">
                   Caregiver dan rencana darurat pasien
                 </span>

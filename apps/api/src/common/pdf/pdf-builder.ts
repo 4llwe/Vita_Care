@@ -20,7 +20,7 @@ export function buildPdf(draw: (doc: PdfDoc) => void): Promise<Buffer> {
   });
 }
 
-/** Kop surat resmi Vita Care Lombok. */
+/** Kop surat resmi Vita Care Hospital At Home. */
 export function drawLetterhead(doc: PdfDoc, subtitle?: string): void {
   const { colors } = VITA_BRAND;
   const left = doc.page.margins.left;

@@ -81,8 +81,7 @@ export class MasterService {
           ...(dto.code !== undefined
             ? { code: dto.code.trim().toUpperCase() }
             : {}),
-          ...(dto.userId !== undefined ? { userId: dto.userId } : {}),
-          ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+            ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
           ...(dto.category !== undefined
             ? { category: dto.category.trim() }
             : {}),

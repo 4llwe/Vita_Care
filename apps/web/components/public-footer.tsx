@@ -1,53 +1,5 @@
-import Link from "next/link";
-import { CONTACT } from "../lib/contact";
-export function PublicFooter() {
-  return (
-    <footer className="border-t border-slate-200 bg-slate-950 text-slate-300">
-      <div className="mx-auto grid max-w-7xl gap-8 px-5 py-12 md:grid-cols-3 lg:px-8">
-        <div>
-          <p className="text-lg font-black text-white">Vita Care Hospital at Home</p>
-          <p className="mt-3 max-w-sm text-sm leading-6 text-slate-400">
-            Koordinasi layanan setara rumah sakit di rumah dengan patient safety,
-            monitoring, dan eskalasi terstruktur.
-          </p>
-        </div>
-        <div>
-          <p className="font-bold text-white">Kontak resmi</p>
-          <address className="mt-3 space-y-2 text-sm not-italic leading-6 text-slate-400">
-            <p>{CONTACT.address}</p>
-            <p>
-              <a href={`mailto:${CONTACT.email}`} className="hover:text-white">
-                {CONTACT.email}
-              </a>
-            </p>
-            <p>
-              <a href={`tel:${CONTACT.phone}`} className="hover:text-white">
-                {CONTACT.phone}
-              </a>{" "}
-              ·{" "}
-              <a
-                href={CONTACT.whatsappUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="hover:text-white"
-              >
-                WhatsApp
-              </a>
-            </p>
-          </address>
-          <div className="mt-3 grid gap-2 text-sm">
-            <Link href="/direktori#layanan">Layanan</Link>
-            <Link href="/direktori#kontak">Kontak dan pengaduan</Link>
-          </div>
-        </div>
-        <div>
-          <p className="font-bold text-white">Kegawatdaruratan</p>
-          <p className="mt-3 text-sm leading-6 text-slate-400">
-            Platform ini tidak menggantikan layanan gawat darurat. Gunakan tombol Darurat
-            untuk jalur bantuan yang dikonfigurasi penyelenggara.
-          </p>
-        </div>
-      </div>
-    </footer>
-  );
-}
+import { ServiceBoundaryNotice } from "./service-boundary-notice";
+import Link from "next/link"; import Image from "next/image"; import { CONTACT } from "../lib/contact";
+const col=(title:string,items:[string,string][])=>({title,items});
+const columns=[col("Layanan",[["Layanan","/direktori#layanan"],["Tim Kesehatan","/direktori#tim-kesehatan"],["Pemesanan","/direktori#pemesanan"],["Monitoring","/direktori#monitoring-pasien"]]),col("Pasien",[["Rekam Medis","/informasi/pasien/rekam-medis"],["Jadwal","/informasi/pasien/jadwal-kunjungan"],["Obat","/informasi/pasien/resep-dan-obat"],["Edukasi","/direktori#edukasi-kesehatan"]]),col("Bantuan",[["FAQ","/informasi/informasi/faq"],["Panduan","/informasi/informasi/panduan-pasien"],["Pengaduan","/informasi/kontak/pengaduan"],["Kebijakan Privasi","/informasi/informasi/kebijakan-privasi"]])];
+export function PublicFooter(){return <><ServiceBoundaryNotice /><footer className="relative overflow-hidden border-t border-emerald-900 bg-slate-950 text-slate-300"><div className="absolute inset-0 opacity-[.05] [background-image:repeating-linear-gradient(135deg,#34d399_0,#34d399_1px,transparent_1px,transparent_18px)]"/><div className="relative mx-auto max-w-7xl px-5 py-12 lg:px-8"><div className="grid gap-10 lg:grid-cols-[1.4fr_repeat(4,1fr)]"><div><div className="flex items-center gap-3"><Image src="/brand/vitacare-lombok-hd.png" alt="Logo Vita Care" width={70} height={54} className="h-14 w-16 rounded-lg bg-white object-contain p-1"/><div><b className="block text-lg tracking-wide text-white">VITA CARE</b><span className="text-xs font-bold uppercase tracking-[.16em] text-emerald-400">Hospital At Home</span></div></div><p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">Perawatan Profesional, Nyaman di Rumah.</p><p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Mataram · Lombok · Nusa Tenggara Barat</p></div>{columns.map(c=><div key={c.title}><h2 className="font-black text-white">{c.title}</h2><div className="mt-4 grid gap-2 text-sm">{c.items.map(([l,h])=><Link key={l} href={h} className="hover:text-emerald-300">{l}</Link>)}</div></div>)}<div><h2 className="font-black text-white">Kontak</h2><div className="mt-4 grid gap-2 text-sm"><a href={`tel:${CONTACT.phone}`}>Telepon</a><a href={CONTACT.whatsappUrl}>WhatsApp</a><a href={`mailto:${CONTACT.email}`}>Email</a><a href={CONTACT.mapUrl}>Lokasi</a></div></div></div><div className="mt-10 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-slate-500 sm:flex-row sm:justify-between"><p>© Vita Care Hospital At Home — Mataram, Lombok, Nusa Tenggara Barat</p><p>Hospital-Level Care at Home</p></div></div></footer></>}

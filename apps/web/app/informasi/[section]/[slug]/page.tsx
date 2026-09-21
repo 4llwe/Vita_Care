@@ -1,3 +1,5 @@
+import { PublicContentSections } from "../../../../components/public-content-sections";
+import { getPublicContent } from "../../../../lib/public-content";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PublicHeader } from "../../../../components/public-header";
@@ -53,6 +55,44 @@ const sectionGuides: Record<string, string[]> = {
     "Eskalasi kritik atau pengaduan",
   ],
 };
+const sectionDescriptions: Record<string, string[]> = {
+  "tentang-kami": [
+    "Mengenal identitas, struktur pengelolaan, tanggung jawab, dan sistem koordinasi Vita Care Hospital At Home.",
+    "Komitmen terhadap keselamatan pasien, kredensial tenaga kesehatan, audit klinis, dan peningkatan mutu berkelanjutan.",
+    "Koordinasi rujukan dengan rumah sakit, laboratorium, apotek, dan fasilitas kesehatan mitra di Mataram dan Lombok.",
+  ],
+  layanan: [
+    "Penjelasan mengenai indikasi, manfaat, batas layanan, dan kebutuhan klinis yang dapat ditangani di rumah.",
+    "Tim Vita Care melakukan asesmen untuk memastikan kondisi pasien, lingkungan rumah, dan dukungan keluarga memenuhi kriteria pelayanan.",
+    "Informasi jadwal, estimasi biaya, persiapan kunjungan, dokumentasi, dan tindak lanjut setelah pelayanan.",
+  ],
+  "tim-kesehatan": [
+    "Tenaga kesehatan menjalani verifikasi identitas, pendidikan, kompetensi, izin praktik, dan kredensial profesional.",
+    "Penugasan disesuaikan dengan kebutuhan klinis pasien, lokasi pelayanan, kompetensi, dan ketersediaan jadwal.",
+    "Dokter, perawat, tenaga penunjang, care coordinator, pasien, dan keluarga bekerja dalam satu rencana perawatan.",
+  ],
+  "edukasi-kesehatan": [
+    "Materi disusun dan ditinjau agar sesuai dengan prinsip kesehatan, keselamatan pasien, dan kebutuhan perawatan di rumah.",
+    "Panduan praktis membantu pasien dan caregiver menjalankan perawatan, penggunaan obat, nutrisi, dan aktivitas secara aman.",
+    "Kenali tanda bahaya dan segera hubungi tenaga kesehatan atau layanan kegawatdaruratan apabila kondisi memburuk.",
+  ],
+  mitra: [
+    "Kerja sama disusun berdasarkan kebutuhan pelayanan, kewenangan, standar mutu, dan tanggung jawab masing-masing pihak.",
+    "Koordinasi mencakup rujukan, pemeriksaan diagnostik, farmasi, peralatan medis, serta tindak lanjut pelayanan.",
+    "Pertukaran informasi mengikuti persetujuan pasien, perlindungan data, audit, dan standar keselamatan pelayanan.",
+  ],
+  informasi: [
+    "Informasi disusun dari sumber resmi dan ditinjau sebelum dipublikasikan kepada pasien, keluarga, dan masyarakat.",
+    "Tanggal penerbitan dan pembaruan membantu pengguna memastikan informasi yang dibaca masih relevan.",
+    "Gunakan kanal resmi Vita Care untuk pertanyaan, klarifikasi, pengaduan, atau kebutuhan tindak lanjut.",
+  ],
+  kontak: [
+    "Hubungi Vita Care melalui nomor telepon, WhatsApp, email, atau kanal resmi yang tercantum pada platform.",
+    "Waktu respons mengikuti jenis kebutuhan, jam pelayanan, prioritas klinis, dan tingkat urgensi permintaan.",
+    "Kritik dan pengaduan ditangani secara tercatat, rahasia, dan diteruskan melalui jalur eskalasi yang sesuai.",
+  ],
+};
+
 function actionFor(section: string, slug: string) {
   if (slug === "whatsapp")
     return {
@@ -93,6 +133,7 @@ export default async function InfoPage({
   const item = itemRecord.label;
   const action = actionFor(group.key, params.slug);
   const operation = operationFromItem(itemRecord, group.key, params.slug);
+  const customContent = getPublicContent(group.key, params.slug);
   const guides = sectionGuides[group.key] ?? [
     "Informasi layanan",
     "Alur dan persyaratan",
@@ -114,22 +155,27 @@ export default async function InfoPage({
               {item}
             </h1>
             <p className="mt-5 text-lg leading-8 text-slate-600">
-              {accessSections.has(group.key)
-                ? `${item} tersedia di ruang layanan yang dilindungi. Setelah masuk, sistem hanya menampilkan data sesuai identitas, penugasan, dan hak akses pengguna.`
-                : `${item} merupakan bagian dari layanan Hospital at Home yang mengutamakan keselamatan pasien, koordinasi klinis, transparansi, dan pengalaman pasien.`}
+              {customContent?.summary ??
+                (accessSections.has(group.key)
+                  ? `${item} tersedia di ruang layanan yang dilindungi. Setelah masuk, sistem hanya menampilkan data sesuai identitas, penugasan, dan hak akses pengguna.`
+                  : `${item} merupakan bagian dari layanan Vita Care Hospital At Home yang mengutamakan keselamatan pasien, koordinasi klinis, transparansi, dan pengalaman pasien.`)}
             </p>
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            {customContent ? (
+              <PublicContentSections content={customContent} />
+            ) : (
+              <div className="mt-8 grid gap-4 sm:grid-cols-3">
               {guides.map((x, i) => (
                 <section key={x} className="rounded-2xl bg-slate-50 p-4">
                   <span className="text-xs font-black text-teal-700">0{i + 1}</span>
                   <h2 className="mt-3 font-extrabold text-slate-900">{x}</h2>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Informasi operasional mengikuti protokol penyelenggara, persetujuan
-                    pasien, dan kebijakan privasi.
+                    {sectionDescriptions[group.key]?.[i] ??
+                      `Pelajari ${x.toLowerCase()} beserta alur, persyaratan, dan tindak lanjut yang berlaku.`}
                   </p>
                 </section>
               ))}
-            </div>
+              </div>
+            )}
             <OperationalActionPanel
               section={group.key}
               slug={params.slug}

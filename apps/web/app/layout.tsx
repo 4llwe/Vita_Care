@@ -1,21 +1,3 @@
-import "./globals.css";
-import type { Metadata } from "next";
-export const metadata: Metadata = {
-  title: {
-    default: "Vita Care Hospital at Home",
-    template: "%s | Vita Care HaH",
-  },
-  description:
-    "Platform Hospital at Home untuk layanan klinis, monitoring, koordinasi, dan keterlibatan keluarga.",
-};
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <html lang="id">
-      <body>{children}</body>
-    </html>
-  );
-}
+import type { Metadata } from "next"; import "./globals.css";
+export const metadata:Metadata={title:{default:"Vita Care Hospital At Home",template:"%s | Vita Care Hospital At Home"},description:"Platform pelayanan kesehatan profesional berbasis rumah di Mataram, Lombok, Nusa Tenggara Barat — Perawatan Profesional, Nyaman di Rumah.",applicationName:"Vita Care Hospital At Home",keywords:["Vita Care","Hospital At Home","Mataram","Lombok","home nursing","doctor visit","digital monitoring","telehealth"],icons:{icon:"/brand/vitacare-lombok-hd.png"},openGraph:{title:"Vita Care Hospital At Home",description:"Hospital-Level Care at Home di Mataram, Lombok, Nusa Tenggara Barat",type:"website"}};
+export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="id"><body>{children}</body></html>}

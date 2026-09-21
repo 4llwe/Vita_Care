@@ -68,7 +68,7 @@ export class ReportingService {
       kvRow(doc, 'Total Risiko', String(s.risks.total));
       kvRow(doc, 'Risiko Tinggi/Kritis', String(s.risks.tinggi));
 
-      signatureBlock(doc, 'Direktur Vita Care Lombok');
+      signatureBlock(doc, 'Direktur Vita Care Hospital At Home');
     });
   }
 

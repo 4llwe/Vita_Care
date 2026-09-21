@@ -12,18 +12,25 @@ export default function HomePage() {
     <>
       <PublicHeader />
       <main className="bg-white">
-        <section className="relative overflow-hidden border-b bg-slate-950">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,rgba(13,148,136,.34),transparent_35%)]" />
+        <section
+          className="relative overflow-hidden border-b border-slate-800 bg-slate-950 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: "url('/brand/home-care-hero.jpeg')",
+            backgroundPosition: "center 38%",
+          }}
+        >
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(2,6,23,.9)_0%,rgba(2,6,23,.68)_38%,rgba(2,6,23,.24)_68%,rgba(2,6,23,.08)_100%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,rgba(13,148,136,.1),transparent_42%)]" />
           <div className="relative mx-auto grid max-w-7xl gap-12 px-5 py-20 lg:grid-cols-[1.2fr_.8fr] lg:px-8 lg:py-28">
             <div>
               <p className="text-xs font-bold uppercase tracking-[.25em] text-teal-300">
-                Hospital-level care at home
+                Vita Care Hospital At Home · Mataram, Lombok
               </p>
               <h1 className="mt-5 max-w-4xl text-4xl font-black leading-tight tracking-tight text-white sm:text-6xl">
-                Perawatan akut terkoordinasi, aman, dan manusiawi di rumah.
+                Perawatan Profesional, Nyaman di Rumah.
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-                Vita Care menghubungkan pasien, keluarga, dokter, perawat,
+                Vita Care Hospital At Home menghubungkan pasien, keluarga, dokter, perawat,
                 laboratorium, farmasi, dan rumah sakit dalam satu clinical
                 workflow yang dapat diaudit.
               </p>
@@ -42,7 +49,7 @@ export default function HomePage() {
                 </Link>
               </div>
             </div>
-            <div className="self-end rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <div className="self-end rounded-3xl border border-white/25 bg-slate-950/20 p-6 shadow-xl backdrop-blur-[2px]">
               <p className="text-sm font-bold text-teal-300">
                 Alur keselamatan klinis
               </p>
@@ -66,9 +73,9 @@ export default function HomePage() {
         </section>
         <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
           <div className="max-w-3xl">
-            <p className="eyebrow">Ringkasan Hospital at Home</p>
+            <p className="eyebrow">Platform pelayanan kesehatan berbasis rumah</p>
             <h2 className="section-title">
-              Clinical workflow lengkap, bukan sekadar kunjungan rumah.
+              Hospital-Level Care at Home yang terhubung, aman, dan manusiawi.
             </h2>
             <p className="section-copy">
               Episode akut dikelola dari asesmen hingga discharge dengan
@@ -166,7 +173,7 @@ export default function HomePage() {
               </p>
             </div>
             <Link
-              href="/direktori#kontak"
+              href="/informasi/kontak/hubungi-kami"
               className="shrink-0 rounded-xl bg-white px-6 py-3 font-extrabold text-teal-800"
             >
               Hubungi kami

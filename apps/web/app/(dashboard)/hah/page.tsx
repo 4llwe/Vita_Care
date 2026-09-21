@@ -60,7 +60,7 @@ export default function HaHPage() {
     [alerts],
   );
   if (loading)
-    return <Loading label="Memuat command center Hospital at Home…" />;
+    return <Loading label="Memuat command center Vita Care Hospital At Home…" />;
   if (error) return <ErrorBox message={error} />;
 
   return (
@@ -71,7 +71,7 @@ export default function HaHPage() {
             Clinical command center
           </p>
           <h1 className="text-2xl font-extrabold text-slate-900">
-            Hospital at Home
+            Vita Care Hospital At Home
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">
             Pantau episode akut, target respons alert, dan kesiapan discharge

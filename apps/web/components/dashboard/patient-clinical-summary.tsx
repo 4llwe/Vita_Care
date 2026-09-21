@@ -22,7 +22,7 @@ export function PatientClinicalSummary() {
     return (
       <section className="medical-card">
         <h2 className="text-lg font-black">
-          Belum ada episode Hospital at Home aktif
+          Belum ada episode Vita Care Hospital At Home aktif
         </h2>
         <p className="mt-2 text-sm text-slate-600">
           Hubungi koordinator layanan untuk asesmen dan aktivasi episode.

@@ -1,6 +1,6 @@
-# Vita Care Lombok — Starter Monorepo
+# Vita Care Hospital At Home — Production Monorepo
 
-Monorepo siap-jalan untuk sistem **home care digital Vita Care Lombok** (web + API + database). Mencakup **13 modul backend**, frontend Next.js dengan **11 halaman fungsional + form input**, RBAC, audit trail, cron otomasi, notifikasi multi-channel, seed data layanan/tarif asli, dan CI/CD.
+Monorepo siap-jalan untuk sistem **platform digital Vita Care Hospital At Home** (web + API + database). Mencakup **13 modul backend**, frontend Next.js dengan **11 halaman fungsional + form input**, RBAC, audit trail, cron otomasi, notifikasi multi-channel, seed data layanan/tarif asli, dan CI/CD.
 
 ## Struktur
 ```

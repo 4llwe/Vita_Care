@@ -216,5 +216,6 @@ export function publicHref(section: string, item: string) {
 export function findPublicItem(section: string, slug: string) {
   const group = PUBLIC_MENU.find((x) => x.key === section);
   const item = group?.items.find((x) => slugify(x) === slug);
-  return group && item ? { group, item } : null;
+  const placeholder = slug.split("-").map((x) => x ? x[0].toUpperCase() + x.slice(1) : x).join(" " );
+  return group ? { group, item: item ?? placeholder } : null;
 }

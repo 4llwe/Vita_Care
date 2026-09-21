@@ -66,7 +66,7 @@ const patient: Item[] = [
 ].map(([href, label]) => ({ href, label }));
 const governance: Item[] = [
   ["/dashboard", "Dashboard"],
-  ["/hah", "Hospital at Home"],
+  ["/hah", "Vita Care Hospital At Home"],
   ["/findings", "Temuan"],
   ["/audits", "Audit & Checklist"],
   ["/risks", "Risiko"],

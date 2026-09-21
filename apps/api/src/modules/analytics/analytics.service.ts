@@ -91,13 +91,13 @@ export class AnalyticsService {
 
   /** Analitik master data: layanan terlaris, utilisasi nakes, tarif rata-rata per kategori. */
   async masterAnalytics(): Promise<MasterAnalytics> {
-    const ongoing = [
+    const ongoing: BookingStatus[] = [
       BookingStatus.DIKONFIRMASI,
       BookingStatus.DITUGASKAN,
       BookingStatus.DALAM_PERJALANAN,
       BookingStatus.BERLANGSUNG,
     ];
-    const done = [BookingStatus.SELESAI, BookingStatus.DIEVALUASI];
+    const done: BookingStatus[] = [BookingStatus.SELESAI, BookingStatus.DIEVALUASI];
 
     const [services, workers, byService, byWorker] = await Promise.all([
       this.prisma.service.findMany({ include: { tariffs: true } }),

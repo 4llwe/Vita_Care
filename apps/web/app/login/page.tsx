@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { api } from "../../lib/api";
 import { setToken } from "../../lib/auth";
 
@@ -66,16 +67,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-gradient-to-br from-vita-green to-vita-blueDark p-4">
+    <div className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top,#047857,#020617_68%)] p-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-5 text-center">
-          <div className="mx-auto mb-2 grid h-12 w-12 place-items-center rounded-xl bg-vita-green text-2xl text-white">
-            🏥
-          </div>
+          <Image src="/brand/vitacare-lombok-hd.png" alt="Logo Vita Care Hospital At Home" width={92} height={72} className="mx-auto mb-3 h-20 w-24 object-contain" />
           <h1 className="text-lg font-extrabold text-vita-greenDark">
-            Vita Care Lombok
+            Vita Care Hospital At Home
           </h1>
-          <p className="text-xs text-slate-400">Masuk ke sistem home care</p>
+          <p className="text-xs text-slate-400">Perawatan Profesional, Nyaman di Rumah.</p>
         </div>
 
         {!tempToken ? (
