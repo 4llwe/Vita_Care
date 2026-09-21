@@ -128,6 +128,7 @@ export type Capa = {
   targetDate: string;
   finding?: { code: string } | null;
   pic?: { name: string } | null;
+  evidenceUrl?: string | null;
 };
 
 export type HeatmapCell = {
