@@ -1,0 +1,957 @@
+// Vita Care Lombok — Prisma schema (subset starter)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  COORDINATOR
+  HEALTH_WORKER
+  AUDITOR
+  UNIT_HEAD
+  DIRECTOR
+  SUPERVISORY_BOARD
+  PATIENT
+  CAREGIVER
+}
+
+enum BookingStatus {
+  DIPESAN
+  DIKONFIRMASI
+  DITUGASKAN
+  DALAM_PERJALANAN
+  BERLANGSUNG
+  SELESAI
+  DIEVALUASI
+  DIBATALKAN
+}
+
+enum FindingCategory {
+  MINOR
+  MAYOR
+  CRITICAL
+  FRAUD_INDICATOR
+  COMPLIANCE_BREACH
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RiskStatus {
+  OPEN
+  MITIGATING
+  CLOSED
+}
+
+enum CapaStatus {
+  OPEN
+  IN_PROGRESS
+  VERIFIED
+  OVERDUE
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum DocumentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum ReferralStatus {
+  REQUESTED
+  ACCEPTED
+  REJECTED
+  COMPLETED
+}
+
+enum ReferralUrgency {
+  ROUTINE
+  URGENT
+  EMERGENCY
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  phone       String?
+  name        String
+  passwordHash String
+  role        Role
+  twoFaSecret String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  findings    Finding[] @relation("FindingPic")
+  capas       Capa[]    @relation("CapaPic")
+  signedRecords MedicalRecord[] @relation("RecordSigner")
+  risks       RiskRegister[] @relation("RiskOwner")
+  documents   Document[] @relation("DocOwner")
+  audits      AuditExecution[] @relation("AuditAuditor")
+  healthWorkerProfile HealthWorker? @relation("HealthWorkerAccount")
+  caregiverAccesses HaHCaregiverAccess[] @relation("CaregiverUser")
+  clinicalMessages HaHClinicalMessage[] @relation("ClinicalMessageSender")
+  protocolApprovals HaHClinicalProtocolApproval[] @relation("ProtocolApprover")
+  breakGlassAccesses HaHBreakGlassAccess[] @relation("BreakGlassUser")
+}
+
+model Service {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  category  String
+  durationMin Int
+  isActive  Boolean  @default(true)
+  tariffs   Tariff[]
+  bookings  Booking[]
+}
+
+model Tariff {
+  id        String  @id @default(cuid())
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+  name      String
+  basePrice Int
+  unit      String  @default("per kunjungan")
+}
+
+model HealthWorker {
+  id               String   @id @default(cuid())
+  userId           String?  @unique
+  user             User?    @relation("HealthWorkerAccount", fields: [userId], references: [id])
+  name             String
+  profession       String   // Dokter | Perawat | Fisioterapis | Analis | Bidan
+  licenseNo        String
+  licenseValidUntil DateTime
+  zone             String
+  isActive         Boolean  @default(true)
+  bookings         Booking[]
+  hahVisits         HaHVisit[]
+}
+
+model Booking {
+  id             String        @id @default(cuid())
+  code           String        @unique
+  patientName    String
+  patientPhone   String?
+  serviceId      String
+  service        Service       @relation(fields: [serviceId], references: [id])
+  healthWorkerId String?
+  healthWorker   HealthWorker? @relation(fields: [healthWorkerId], references: [id])
+  zone           String
+  addressLat     Float?
+  addressLng     Float?
+  // Posisi nakes real-time saat menuju lokasi pasien (status DALAM_PERJALANAN).
+  workerLat      Float?
+  workerLng      Float?
+  workerLocAt    DateTime?
+  status         BookingStatus @default(DIPESAN)
+  scheduledAt    DateTime
+  createdAt      DateTime      @default(now())
+  record         MedicalRecord?
+  invoice        Invoice?
+  referrals      Referral[]
+}
+
+model MedicalRecord {
+  id            String    @id @default(cuid())
+  bookingId     String    @unique
+  booking       Booking   @relation(fields: [bookingId], references: [id])
+  patientName   String
+  // SOAP
+  subjective    String
+  objective     String
+  assessment    String
+  plan          String
+  // Vitals
+  systolic      Int?
+  diastolic     Int?
+  heartRate     Int?
+  respRate      Int?
+  temperature   Float?
+  spo2          Int?
+  consciousness String?   // A | V | P | U (AVPU)
+  // EWS
+  ewsScore      Int       @default(0)
+  ewsRisk       String    @default("low")
+  // Signing & locking
+  signedById    String?
+  signedBy      User?     @relation("RecordSigner", fields: [signedById], references: [id])
+  signedAt      DateTime?
+  locked        Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  code           String        @unique
+  bookingId      String?       @unique
+  booking        Booking?      @relation(fields: [bookingId], references: [id])
+  patientName    String
+  subtotal       Int
+  tax            Int           @default(0)
+  total          Int
+  status         InvoiceStatus @default(UNPAID)
+  midtransOrderId String?      @unique
+  snapToken      String?
+  issuedAt       DateTime      @default(now())
+  paidAt         DateTime?
+  items          InvoiceItem[]
+  payments       Payment[]
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+  description String
+  qty         Int     @default(1)
+  unitPrice   Int
+  amount      Int
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  invoiceId       String
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id])
+  method          String?
+  grossAmount     Int
+  status          String
+  transactionTime DateTime?
+  rawPayload      Json?
+  createdAt       DateTime @default(now())
+}
+
+model Finding {
+  id          String          @id @default(cuid())
+  code        String          @unique
+  description String
+  category    FindingCategory
+  rootCause   String?
+  probability Int             // 1..5
+  impact      Int             // 1..5
+  riskLevel   RiskLevel
+  picId       String?
+  pic         User?           @relation("FindingPic", fields: [picId], references: [id])
+  deadline    DateTime?
+  createdAt   DateTime        @default(now())
+  capa        Capa?
+  // Tautan ke butir audit yang melahirkan temuan ini (alur audit -> tindak lanjut).
+  auditAnswerId String?       @unique
+  auditAnswer   AuditAnswer?  @relation("AnswerFinding", fields: [auditAnswerId], references: [id], onDelete: SetNull)
+}
+
+model Capa {
+  id         String     @id @default(cuid())
+  findingId  String     @unique
+  finding    Finding    @relation(fields: [findingId], references: [id])
+  actionPlan String
+  targetDate DateTime
+  progress   Int        @default(0)
+  status     CapaStatus @default(OPEN)
+  evidenceUrl String?
+  escalated  Boolean    @default(false)
+  picId      String?
+  pic        User?      @relation("CapaPic", fields: [picId], references: [id])
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model RiskRegister {
+  id          String     @id @default(cuid())
+  code        String     @unique
+  title       String
+  category    String     // Klinis | Operasional | Kepatuhan | Keuangan | SDM | Reputasi
+  probability Int        // 1..5
+  impact      Int        // 1..5
+  score       Int        // probability * impact
+  level       RiskLevel
+  mitigation  String?
+  status      RiskStatus @default(OPEN)
+  ownerId     String?
+  owner       User?      @relation("RiskOwner", fields: [ownerId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Document {
+  id            String           @id @default(cuid())
+  code          String           @unique
+  title         String
+  category      String           // SOP | Kebijakan | Formulir | Sertifikat | Panduan
+  currentVersion Int             @default(0)
+  status        DocumentStatus   @default(DRAFT)
+  ownerId       String?
+  owner         User?            @relation("DocOwner", fields: [ownerId], references: [id])
+  approverId    String?
+  approvedAt    DateTime?
+  reviewNote    String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  versions      DocumentVersion[]
+}
+
+model DocumentVersion {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id])
+  version     Int
+  fileUrl     String
+  changeNote  String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([documentId, version])
+}
+
+model Referral {
+  id          String          @id @default(cuid())
+  code        String          @unique
+  patientName String
+  bookingId   String?
+  booking     Booking?        @relation(fields: [bookingId], references: [id])
+  toHospital  String
+  reason      String
+  urgency     ReferralUrgency @default(ROUTINE)
+  status      ReferralStatus  @default(REQUESTED)
+  note        String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  action    String
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  createdAt DateTime @default(now())
+}
+
+enum ChecklistCategory {
+  CLINICAL
+  OPERATIONAL
+  COMPLIANCE
+  SAFETY
+  DOCUMENTATION
+}
+
+enum AuditExecutionStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ComplianceResult {
+  COMPLIANT
+  PARTIAL
+  NON_COMPLIANT
+  NOT_APPLICABLE
+}
+
+/// Template checklist audit (kumpulan pertanyaan/kriteria).
+model AuditChecklist {
+  id          String            @id @default(cuid())
+  code        String            @unique // CL-YYYY-NNN
+  title       String
+  category    ChecklistCategory
+  description String?
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  items       ChecklistItem[]
+  executions  AuditExecution[]
+}
+
+/// Butir/kriteria dalam sebuah checklist.
+model ChecklistItem {
+  id          String         @id @default(cuid())
+  checklistId String
+  checklist   AuditChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  order       Int            @default(0)
+  question    String
+  guidance    String?
+  weight      Int            @default(1) // bobot untuk skor
+  answers     AuditAnswer[]
+}
+
+/// Pelaksanaan audit terhadap sebuah unit/auditee.
+model AuditExecution {
+  id          String               @id @default(cuid())
+  code        String               @unique // AU-YYYY-NNN
+  checklistId String
+  checklist   AuditChecklist       @relation(fields: [checklistId], references: [id])
+  auditeeUnit String
+  zone        String?
+  auditorId   String?
+  auditor     User?                @relation("AuditAuditor", fields: [auditorId], references: [id])
+  status      AuditExecutionStatus @default(DRAFT)
+  scorePct    Float                @default(0)
+  note        String?
+  startedAt   DateTime             @default(now())
+  completedAt DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  answers     AuditAnswer[]
+  evidences   Evidence[]
+}
+
+/// Jawaban per butir dalam satu pelaksanaan audit.
+model AuditAnswer {
+  id          String           @id @default(cuid())
+  executionId String
+  execution   AuditExecution   @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        ChecklistItem    @relation(fields: [itemId], references: [id])
+  result      ComplianceResult @default(NOT_APPLICABLE)
+  note        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  evidences   Evidence[]
+  finding     Finding?         @relation("AnswerFinding")
+
+  @@unique([executionId, itemId])
+}
+
+/// Bukti audit (foto/berkas) dengan geolokasi & timestamp tangkap.
+model Evidence {
+  id           String          @id @default(cuid())
+  executionId  String
+  execution    AuditExecution  @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  answerId     String?
+  answer       AuditAnswer?    @relation(fields: [answerId], references: [id], onDelete: SetNull)
+  fileUrl      String
+  caption      String?
+  latitude     Float?
+  longitude    Float?
+  accuracy     Float?
+  capturedAt   DateTime?
+  uploadedById String?
+  createdAt    DateTime        @default(now())
+}
+
+
+// -----------------------------------------------------------------------------
+// Hospital at Home clinical operating model
+// Protocol thresholds MUST be approved by the provider's clinical governance body.
+// -----------------------------------------------------------------------------
+enum HaHEpisodeStatus {
+  SCREENING
+  ELIGIBLE
+  INELIGIBLE
+  ADMITTED
+  ACTIVE
+  TRANSFER_REQUESTED
+  TRANSFERRED
+  DISCHARGED
+  CANCELLED
+}
+
+enum HaHEligibilityDecision {
+  PENDING
+  ELIGIBLE
+  INELIGIBLE
+  OVERRIDE_ELIGIBLE
+}
+
+enum ClinicalAlertSeverity {
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ClinicalAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum HaHVisitStatus {
+  PLANNED
+  EN_ROUTE
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MedicationOrderStatus {
+  ACTIVE
+  HELD
+  COMPLETED
+  CANCELLED
+}
+
+enum DiagnosticOrderStatus {
+  ORDERED
+  COLLECTED
+  PROCESSING
+  RESULTED
+  ACKNOWLEDGED
+  CANCELLED
+}
+
+enum EquipmentAssignmentStatus {
+  REQUESTED
+  DELIVERED
+  IN_USE
+  RETURNED
+  CANCELLED
+}
+
+model HaHPatient {
+  id                 String       @id @default(cuid())
+  mrn                String       @unique
+  portalUserId       String?      @unique
+  nationalId         String?      @unique
+  fullName           String
+  dateOfBirth        DateTime
+  sexAtBirth         String
+  phone              String?
+  address             String
+  zone                String
+  emergencyContactName String?
+  emergencyContactPhone String?
+  allergies          Json?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  episodes            HaHEpisode[]
+  caregiverAccesses   HaHCaregiverAccess[]
+}
+
+model HaHEpisode {
+  id                    String             @id @default(cuid())
+  code                  String             @unique
+  patientId             String
+  patient               HaHPatient         @relation(fields: [patientId], references: [id])
+  status                HaHEpisodeStatus   @default(SCREENING)
+  admissionSource       String
+  referringFacility     String?
+  referringClinician    String?
+  attendingPhysicianId  String
+  primaryDiagnosis      String
+  comorbidities         Json?
+  acuityLevel           String             @default("ACUTE_STABLE")
+  zone                  String
+  expectedLengthOfStayDays Int?
+  consentAt             DateTime?
+  consentBy             String?
+  caregiverName         String?
+  caregiverPhone        String?
+  emergencyPlan         String?
+  admissionAt           DateTime?
+  dischargeAt           DateTime?
+  dischargeDisposition  String?
+  dischargeSummary      String?
+  createdById           String
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  eligibility           HaHEligibilityAssessment?
+  carePlan              HaHCarePlan?
+  observations          HaHObservation[]
+  alerts                ClinicalAlert[]
+  visits                HaHVisit[]
+  medicationOrders      MedicationOrder[]
+  transfers             HaHTransfer[]
+  diagnosticOrders      HaHDiagnosticOrder[]
+  equipmentAssignments  HaHEquipmentAssignment[]
+  carePlanRevisions      HaHCarePlanRevision[]
+  messages               HaHClinicalMessage[]
+  breakGlassAccesses     HaHBreakGlassAccess[]
+
+  @@index([status, createdAt])
+  @@index([patientId, createdAt])
+}
+
+model HaHEligibilityAssessment {
+  id                       String                 @id @default(cuid())
+  episodeId                String                 @unique
+  episode                  HaHEpisode             @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  age18OrOlder             Boolean
+  acuteHospitalLevelNeed   Boolean
+  clinicallyStableForHome  Boolean
+  noImmediateProcedureNeed Boolean
+  oxygenRequirementLpm     Float                  @default(0)
+  homeEnvironmentSafe      Boolean
+  withinServiceArea        Boolean
+  reliableCommunication    Boolean
+  patientConsents          Boolean
+  caregiverAvailable       Boolean?
+  exclusionReasons         Json?
+  decision                 HaHEligibilityDecision
+  overrideReason           String?
+  assessedById             String
+  assessedAt               DateTime               @default(now())
+}
+
+model HaHCarePlan {
+  id                  String       @id @default(cuid())
+  episodeId           String       @unique
+  episode             HaHEpisode   @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  diagnosis           String?
+  goals               Json
+  interventions       Json
+  doctorInterventions Json?
+  nursingInterventions Json?
+  dietPlan            String?
+  activityPlan        String?
+  educationPlan       String?
+  followUpPlan        String?
+  evaluationTarget    String?
+  visitFrequency      String
+  monitoringFrequency String
+  escalationPlan      String
+  medicationPlan      String?
+  equipmentPlan       String?
+  nextReviewAt        DateTime
+  approvedById        String
+  approvedAt          DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+}
+
+model HaHCarePlanRevision {
+  id String @id @default(cuid())
+  episodeId String
+  episode HaHEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  version Int
+  snapshot Json
+  changedById String
+  changedAt DateTime @default(now())
+  @@unique([episodeId, version])
+  @@index([episodeId, changedAt])
+}
+
+model HaHObservation {
+  id                  String       @id @default(cuid())
+  episodeId           String
+  episode             HaHEpisode   @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  systolic            Int
+  diastolic           Int
+  heartRate           Int
+  respRate            Int
+  temperature         Float
+  spo2                Int
+  supplementalOxygen  Boolean      @default(false)
+  oxygenFlowLpm       Float?
+  spo2Scale           Int          @default(1)
+  consciousness       String
+  newConfusion        Boolean      @default(false)
+  painScore           Int?
+  glucoseMgDl         Float?
+  weightKg            Float?
+  symptomNotes        String?
+  ewsScore            Int
+  ewsRisk             String
+  recordedById        String
+  recordedAt          DateTime     @default(now())
+  alerts              ClinicalAlert[]
+
+  @@index([episodeId, recordedAt])
+}
+
+model ClinicalAlert {
+  id                  String                @id @default(cuid())
+  episodeId           String
+  episode             HaHEpisode            @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  observationId       String?
+  observation         HaHObservation?       @relation(fields: [observationId], references: [id], onDelete: SetNull)
+  severity            ClinicalAlertSeverity
+  status              ClinicalAlertStatus   @default(OPEN)
+  trigger             String
+  responseDueAt       DateTime
+  acknowledgedById    String?
+  acknowledgedAt      DateTime?
+  resolution          String?
+  resolvedById        String?
+  resolvedAt          DateTime?
+  createdAt           DateTime              @default(now())
+  escalationLevel     Int                   @default(0)
+  lastEscalatedAt     DateTime?
+  events              ClinicalAlertEvent[]
+
+  @@index([status, severity, responseDueAt])
+  @@index([episodeId, createdAt])
+}
+
+model ClinicalAlertEvent {
+  id String @id @default(cuid())
+  alertId String
+  alert ClinicalAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  type String
+  actorId String?
+  detail Json?
+  createdAt DateTime @default(now())
+  @@index([alertId, createdAt])
+}
+
+model HaHCaregiverAccess {
+  id String @id @default(cuid())
+  patientId String
+  patient HaHPatient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  caregiverId String
+  caregiver User @relation("CaregiverUser", fields: [caregiverId], references: [id], onDelete: Cascade)
+  scope Json
+  consentBy String
+  consentAt DateTime
+  expiresAt DateTime?
+  revokedAt DateTime?
+  revokedById String?
+  createdAt DateTime @default(now())
+  @@unique([patientId, caregiverId])
+  @@index([caregiverId, revokedAt])
+}
+
+model HaHClinicalMessage {
+  id String @id @default(cuid())
+  episodeId String
+  episode HaHEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  senderId String
+  sender User @relation("ClinicalMessageSender", fields: [senderId], references: [id])
+  body String
+  category String @default("GENERAL")
+  priority String @default("ROUTINE")
+  attachmentUrls Json?
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([episodeId, createdAt])
+}
+
+model HaHClinicalProtocol {
+  id String @id @default(cuid())
+  version Int @unique
+  name String
+  thresholds Json
+  responseSla Json
+  status String @default("DRAFT")
+  approvedById String?
+  approvalNote String?
+  approvedAt DateTime?
+  activeFrom DateTime?
+  retiredAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([status, activeFrom])
+}
+
+model HaHVisit {
+  id                  String         @id @default(cuid())
+  episodeId           String
+  episode             HaHEpisode     @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  healthWorkerId      String
+  healthWorker        HealthWorker   @relation(fields: [healthWorkerId], references: [id])
+  visitType           String
+  status              HaHVisitStatus @default(PLANNED)
+  scheduledStart      DateTime
+  scheduledEnd        DateTime
+  arrivedAt           DateTime?
+  completedAt         DateTime?
+  handoverNote        String?
+  createdAt           DateTime       @default(now())
+
+  @@index([episodeId, scheduledStart])
+  @@index([healthWorkerId, scheduledStart])
+}
+
+model MedicationOrder {
+  id                  String                @id @default(cuid())
+  episodeId           String
+  episode             HaHEpisode            @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  medicationName      String
+  dose                String
+  route               String
+  frequency           String
+  indication          String
+  startAt             DateTime
+  endAt               DateTime?
+  status              MedicationOrderStatus @default(ACTIVE)
+  prescribedById      String
+  prescribedAt        DateTime              @default(now())
+  administrations     MedicationAdministration[]
+
+  @@index([episodeId, status])
+}
+
+model MedicationAdministration {
+  id                  String          @id @default(cuid())
+  medicationOrderId   String
+  medicationOrder     MedicationOrder @relation(fields: [medicationOrderId], references: [id], onDelete: Cascade)
+  administeredById    String
+  scheduledAt         DateTime
+  administeredAt      DateTime?
+  status              String
+  note                String?
+
+  @@index([medicationOrderId, scheduledAt])
+}
+
+model HaHTransfer {
+  id                  String       @id @default(cuid())
+  episodeId           String
+  episode             HaHEpisode   @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  destination         String
+  reason              String
+  urgency             String
+  sbarHandover        String
+  transportProvider   String?
+  requestedById       String
+  requestedAt         DateTime     @default(now())
+  acceptedAt          DateTime?
+  departedAt          DateTime?
+  arrivedAt           DateTime?
+
+  @@index([episodeId, requestedAt])
+}
+
+
+model HaHDiagnosticOrder {
+  id                 String                @id @default(cuid())
+  episodeId          String
+  episode            HaHEpisode            @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  category           String
+  testName           String
+  specimen           String?
+  priority           String                @default("ROUTINE")
+  status             DiagnosticOrderStatus @default(ORDERED)
+  orderedById        String
+  orderedAt          DateTime              @default(now())
+  collectedAt        DateTime?
+  resultedAt         DateTime?
+  resultText         String?
+  criticalResult     Boolean               @default(false)
+  acknowledgedById   String?
+  acknowledgedAt     DateTime?
+  @@index([episodeId, status])
+}
+
+model HaHEquipmentAssignment {
+  id                 String                    @id @default(cuid())
+  episodeId          String
+  episode            HaHEpisode                @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  equipmentType      String
+  serialNumber       String?
+  supplier           String?
+  status             EquipmentAssignmentStatus @default(REQUESTED)
+  requestedById      String
+  requestedAt        DateTime                  @default(now())
+  deliveredAt        DateTime?
+  returnedAt         DateTime?
+  instructions       String?
+  @@index([episodeId, status])
+}
+
+model NotificationDelivery {
+  id String @id @default(cuid())
+  channel String
+  to String?
+  title String
+  body String
+  status String @default("PENDING")
+  attempts Int @default(0)
+  maxAttempts Int @default(5)
+  nextAttemptAt DateTime @default(now())
+  providerId String?
+  lastError String?
+  deliveredAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, nextAttemptAt])
+}
+
+model HaHClinicalProtocolApproval {
+  id String @id @default(cuid())
+  protocolId String
+  protocol HaHClinicalProtocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  approverId String
+  approver User @relation("ProtocolApprover", fields: [approverId], references: [id])
+  decision String
+  note String
+  createdAt DateTime @default(now())
+  @@unique([protocolId, approverId])
+  @@index([protocolId, createdAt])
+}
+
+model HaHBreakGlassAccess {
+  id String @id @default(cuid())
+  episodeId String
+  episode HaHEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation("BreakGlassUser", fields: [userId], references: [id])
+  reason String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt, revokedAt])
+}
+
+model PublicServiceRequest {
+  id String @id @default(cuid())
+  type String
+  section String
+  slug String
+  name String
+  email String?
+  phone String?
+  message String
+  preferredAt DateTime?
+  status String @default("NEW")
+  source String @default("PUBLIC_MENU")
+  assignedToId String?
+  resolution String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, createdAt])
+  @@index([type, section])
+}
+
+model NavigationMenuGroup {
+  id String @id @default(cuid())
+  key String @unique
+  label String
+  description String?
+  isActive Boolean @default(true)
+  sortOrder Int @default(0)
+  items NavigationMenuItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([isActive, sortOrder])
+}
+
+model NavigationMenuItem {
+  id String @id @default(cuid())
+  groupId String
+  group NavigationMenuGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  label String
+  slug String
+  description String?
+  operationKind String @default("information")
+  requestType String?
+  headline String?
+  steps Json?
+  sla String?
+  hrefOverride String?
+  isActive Boolean @default(true)
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([groupId, slug])
+  @@index([isActive, sortOrder])
+}

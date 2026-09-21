@@ -1,0 +1,23 @@
+name: Security supply chain
+on:
+  pull_request:
+  push: { branches: [main] }
+  schedule: [{ cron: "0 3 * * 1" }]
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, security-events: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.0.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level high
+      - uses: anchore/sbom-action@v0
+        with: { path: ., format: spdx-json, output-file: sbom.spdx.json }
+      - uses: aquasecurity/trivy-action@0.24.0
+        with: { scan-type: fs, scan-ref: ., severity: HIGH,CRITICAL, exit-code: 1, ignore-unfixed: true }
+      - uses: actions/upload-artifact@v4
+        with: { name: security-evidence, path: sbom.spdx.json }

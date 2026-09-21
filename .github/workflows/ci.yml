@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vitacare
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: vitacare_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U vitacare"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://vitacare:secret@localhost:5432/vitacare_test
+      JWT_ACCESS_SECRET: ci_access
+      JWT_REFRESH_SECRET: ci_refresh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm prisma generate
+      - run: pnpm prisma migrate deploy
+      - name: Lint
+        run: pnpm lint
+      - name: Unit test
+        run: pnpm --filter api test
+      - name: Build
+        run: pnpm build
+
+  e2e:
+    needs: build-test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vitacare
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: vitacare
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U vitacare"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://vitacare:secret@localhost:5432/vitacare
+      JWT_ACCESS_SECRET: ci_access
+      JWT_REFRESH_SECRET: ci_refresh
+      ENCRYPTION_KEY: ci_encryption_key_please_change_32x
+      WEB_ORIGIN: http://localhost:3000
+      API_URL: http://localhost:3001
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm prisma generate
+      - run: pnpm prisma migrate deploy
+      - run: pnpm seed
+      - name: Build aplikasi
+        run: pnpm build
+      - name: Pasang browser Playwright
+        run: pnpm --filter e2e install:browsers
+      - name: Jalankan API & Web
+        run: |
+          node apps/api/dist/main.js & echo $! > /tmp/api.pid
+          pnpm --filter web start & echo $! > /tmp/web.pid
+          npx wait-on http://localhost:3001/api/health http://localhost:3000 -t 60000
+      - name: e2e Playwright
+        run: pnpm --filter e2e test
+      - name: Unggah laporan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/e2e/playwright-report
+          retention-days: 7
+
+  docker:
+    needs: [build-test, e2e]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images
+        run: |
+          docker build -f apps/api/Dockerfile -t vitacare-api:latest .
+          docker build -f apps/web/Dockerfile -t vitacare-web:latest .
+      # TODO: push ke registry & deploy (mis. ke VPS / cloud run)

@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root {
+  --vita-green: #0f766e;
+  --vita-blue: #1d4ed8;
+  color-scheme: light;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: Arial, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+a,
+input,
+select,
+textarea {
+  transition-duration: 160ms;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(20, 184, 166, 0.28);
+  outline-offset: 2px;
+}
+.medical-card {
+  @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm;
+}
+.eyebrow {
+  @apply text-xs font-black uppercase tracking-[.2em] text-teal-700;
+}
+.section-title {
+  @apply mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl;
+}
+.section-copy {
+  @apply mt-4 text-base leading-7 text-slate-600;
+}
+::selection {
+  background: #99f6e4;
+  color: #134e4a;
+}

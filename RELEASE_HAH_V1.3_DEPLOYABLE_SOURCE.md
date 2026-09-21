@@ -1,0 +1,2 @@
+# v1.3 Deployable Source
+Adds a complete production environment template, secret generator, strict predeploy gate, migration hygiene check, versioned health identity, production smoke tests, deterministic deployment command, evidence capture, Docker exclusions, Make targets, and deploy-now runbook. External credentials, TLS material, dependency registry access, and live infrastructure remain operator-supplied by design.
