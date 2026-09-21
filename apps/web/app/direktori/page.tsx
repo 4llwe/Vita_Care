@@ -3,7 +3,8 @@ import { PublicHeader } from "../../components/public-header";
 import { PublicFooter } from "../../components/public-footer";
 import { publicHref } from "../../lib/public-menu";
 import { asLegacyMenu, loadDynamicMenu } from "../../lib/dynamic-menu";
-export default function Directory() {
+export default async function Directory() {
+  const menu = asLegacyMenu(await loadDynamicMenu());
   return (
     <>
       <PublicHeader />
@@ -17,7 +18,7 @@ export default function Directory() {
           masyarakat.
         </p>
         <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {PUBLIC_MENU.map((g) => (
+          {menu.map((g) => (
             <section key={g.key} id={g.key} className="medical-card scroll-mt-24">
               <h2 className="text-xl font-black text-slate-950">{g.label}</h2>
               <ul className="mt-5 space-y-1">
