@@ -9,7 +9,9 @@ export default function ServiceRequests() {
     api<any[]>("/public-requests", { token: getToken() })
       .then(setRows)
       .catch((e) => setError(e.message));
-  useEffect(load, []);
+  useEffect(() => {
+    void load();
+  }, []);
   async function update(id: string, status: string) {
     await api(`/public-requests/${id}`, {
       method: "PATCH",
