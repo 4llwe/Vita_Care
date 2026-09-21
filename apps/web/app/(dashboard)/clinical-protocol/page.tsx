@@ -17,7 +17,9 @@ export default function ClinicalProtocol() {
     api<any>("/hah/protocols/active", { token: getToken() })
       .then(setActive)
       .catch(() => setActive(null));
-  useEffect(load, []);
+  useEffect(() => {
+    void load();
+  }, []);
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
