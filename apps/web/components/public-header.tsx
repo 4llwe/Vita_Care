@@ -1,3 +1,8 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { PUBLIC_MENU, publicHref } from "../lib/public-menu";
+import { asLegacyMenu, loadDynamicMenu } from "../lib/dynamic-menu";
 import Link from "next/link";
 import { EmergencyButton } from "./emergency-button";
 export function PublicHeader() {
