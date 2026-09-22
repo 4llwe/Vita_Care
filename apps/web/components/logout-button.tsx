@@ -1,17 +1,1 @@
-"use client";
-import { useRouter } from "next/navigation";
-export function LogoutButton() {
-  const r = useRouter();
-  return (
-    <button
-      onClick={() => {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        r.replace("/login");
-      }}
-      className="text-sm font-bold text-slate-500 hover:text-slate-900"
-    >
-      Keluar
-    </button>
-  );
-}
+"use client";import{useRouter}from"next/navigation";import{api}from"../lib/api";import{clearToken}from"../lib/auth";export function LogoutButton(){const r=useRouter();return <button onClick={async()=>{try{await api("/auth/logout",{method:"POST"});}catch{}clearToken();r.replace("/login");r.refresh();}} className="text-sm font-bold text-slate-500 hover:text-slate-900">Keluar</button>;}

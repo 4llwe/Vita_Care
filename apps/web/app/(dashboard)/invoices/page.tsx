@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../../lib/api";
 import { getToken } from "../../../lib/auth";
+import { fetchMe, type Session } from "../../../lib/session";
 import { rupiah, tanggal } from "../../../lib/format";
 import type { Invoice } from "../../../lib/types";
 import { StatusBadge } from "../../../components/status-badge";
@@ -11,11 +12,11 @@ import { Loading, ErrorBox, Empty } from "../../../components/async-state";
 export default function InvoicesPage() {
   const [rows, setRows] = useState<Invoice[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    api<Invoice[]>("/invoices", { token: getToken() })
-      .then(setRows)
-      .catch((e) => setError(e.message));
+    fetchMe().then(async (me) => { setSession(me); setRows(await api<Invoice[]>(me.role === "PATIENT" ? "/invoices/me" : "/invoices", { token: getToken() })); })
+      .catch((e) => setError(e instanceof Error ? e.message : "Gagal memuat tagihan"));
   }, []);
 
   async function pay(id: string) {
@@ -39,12 +40,12 @@ export default function InvoicesPage() {
         <h1 className="text-xl font-extrabold text-slate-800">
           Tagihan & Pembayaran
         </h1>
-        <a
+        {session?.role !== "PATIENT" ? <a
           href="/api/reports/invoices.csv"
           className="text-sm font-semibold text-vita-blue hover:underline"
         >
           ⬇ Export CSV
-        </a>
+        </a> : null}
       </div>
       {rows.length === 0 ? (
         <Empty label="Belum ada tagihan." />

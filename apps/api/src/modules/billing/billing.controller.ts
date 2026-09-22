@@ -4,6 +4,7 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller()
 export class BillingController {
@@ -19,15 +20,20 @@ export class BillingController {
   @Post('invoices/:id/pay')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('PATIENT', 'COORDINATOR', 'SUPER_ADMIN')
-  pay(@Param('id') id: string) {
-    return this.billing.pay(id);
+  pay(@Param('id') id: string, @CurrentUser() user: { id: string; role: string }) {
+    return this.billing.pay(id, user);
   }
+
+  @Get('invoices/me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('PATIENT')
+  mine(@CurrentUser() user: { id: string }) { return this.billing.myInvoices(user.id); }
 
   @Get('invoices/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('PATIENT', 'COORDINATOR', 'SUPER_ADMIN', 'DIRECTOR', 'AUDITOR')
-  findOne(@Param('id') id: string) {
-    return this.billing.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: { id: string; role: string }) {
+    return this.billing.findOne(id, user);
   }
 
   @Get('invoices')
