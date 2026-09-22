@@ -40,6 +40,8 @@ jobs:
       WEB_ORIGIN: http://127.0.0.1:3000
       API_URL: http://127.0.0.1:3001
       NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+      E2E_WEB_URL: http://127.0.0.1:3000
+      E2E_API_URL: http://127.0.0.1:3001
       SEED_ADMIN_EMAIL: ci-admin@vitacare.invalid
       SEED_ADMIN_PASSWORD: CI-only-password-2026!
       SEED_MASTER_DATA: "false"
@@ -64,6 +66,12 @@ jobs:
       - name: Build isolated database from authoritative schema
         run: pnpm exec prisma db push --force-reset --skip-generate
       - run: pnpm seed
+      - name: Seed isolated navigation menu fixtures
+        run: |
+          set -euo pipefail
+          grep -E '^INSERT INTO "(NavigationMenuGroup|NavigationMenuItem)"' prisma/migrations/20260925_dynamic_menu_cms/migration.sql > /tmp/menu-seed.sql
+          test -s /tmp/menu-seed.sql
+          pnpm exec prisma db execute --schema=prisma/schema.prisma --file=/tmp/menu-seed.sql
       - name: Negative authorization boundary tests
         run: pnpm --filter api test -- --runInBand authorization-boundaries.spec.ts
       - name: Full API unit tests
