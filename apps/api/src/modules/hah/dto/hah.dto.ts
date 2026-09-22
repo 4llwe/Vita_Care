@@ -185,6 +185,8 @@ export class SendClinicalMessageDto {
   @IsOptional()
   @IsIn(["GENERAL", "CARE_INSTRUCTION", "SYMPTOM_REPORT", "MEDICATION", "FOLLOW_UP"])
   category?: string;
+  @IsOptional() @IsIn(["ROUTINE", "URGENT"]) priority?: string;
+  @IsOptional() @IsArray() attachmentUrls?: string[];
 }
 export class CreateClinicalProtocolDto {
   @IsString() @MinLength(3) name!: string;
