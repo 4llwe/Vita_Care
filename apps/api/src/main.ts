@@ -70,12 +70,4 @@ async function bootstrap() {
     }),
   );
 }
-void bootstrap().catch((error) => {
-  console.error(
-    JSON.stringify({
-      event: "bootstrap_failed",
-      message: error instanceof Error ? error.message : "unknown",
-    }),
-  );
-  process.exit(1);
-});
+bootstrap();
