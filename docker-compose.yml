@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: vitacare
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: vitacare
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vitacare"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    env_file: .env
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["3001:3001"]
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    env_file: .env
+    depends_on: [api]
+    ports: ["3000:3000"]
+volumes:
+  pgdata: {}

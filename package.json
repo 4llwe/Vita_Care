@@ -1,0 +1,29 @@
+{
+  "name": "vitacare",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init",
+    "prisma:deploy": "prisma migrate deploy",
+    "seed": "ts-node prisma/seed.ts",
+    "preflight:prod": "sh scripts/preflight-production.sh",
+    "verify:menus": "node scripts/verify-menu-operations.mjs",
+    "verify:prod": "pnpm preflight:prod && pnpm verify:menus && pnpm lint && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "prisma": "^5.18.0",
+    "ts-node": "^10.9.2",
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.18.0",
+    "argon2": "^0.40.3"
+  }
+}

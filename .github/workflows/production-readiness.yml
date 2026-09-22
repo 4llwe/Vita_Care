@@ -1,0 +1,34 @@
+name: Production readiness
+on: [pull_request, push]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: vitacare, POSTGRES_PASSWORD: vitacare_test, POSTGRES_DB: vitacare_test }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://vitacare:vitacare_test@localhost:5432/vitacare_test
+      JWT_ACCESS_SECRET: 01234567890123456789012345678901
+      JWT_REFRESH_SECRET: 12345678901234567890123456789012
+      ENCRYPTION_KEY: 23456789012345678901234567890123
+      WEB_ORIGIN: http://localhost:3000
+      API_URL: http://localhost:3001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.0.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: test -f pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma:generate
+      - run: pnpm prisma migrate deploy
+      - run: pnpm verify:menus
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm --filter e2e test

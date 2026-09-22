@@ -1,0 +1,3 @@
+CREATE TABLE "PublicServiceRequest" ("id" TEXT PRIMARY KEY,"type" TEXT NOT NULL,"section" TEXT NOT NULL,"slug" TEXT NOT NULL,"name" TEXT NOT NULL,"email" TEXT,"phone" TEXT,"message" TEXT NOT NULL,"preferredAt" TIMESTAMP(3),"status" TEXT NOT NULL DEFAULT 'NEW',"source" TEXT NOT NULL DEFAULT 'PUBLIC_MENU',"assignedToId" TEXT,"resolution" TEXT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE INDEX "PublicServiceRequest_status_createdAt_idx" ON "PublicServiceRequest"("status","createdAt");
+CREATE INDEX "PublicServiceRequest_type_section_idx" ON "PublicServiceRequest"("type","section");

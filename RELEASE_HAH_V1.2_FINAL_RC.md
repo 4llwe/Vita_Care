@@ -1,0 +1,2 @@
+# Vita Care HaH v1.2 Final RC
+Adds database-driven navigation CMS seeded with all 14 groups and 117 submenu items. Super Admin can create, edit, order, and deactivate groups/items from the dashboard. Public header, directory, and dynamic content pages read live menu data with a static safety fallback, so new menu items become operational without rebuilding the application. All changes are audited and role-protected.

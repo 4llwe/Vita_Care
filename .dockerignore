@@ -1,0 +1,13 @@
+.git
+.github
+**/node_modules
+**/.next
+**/dist
+.env*
+!.env.example
+!.env.production.example
+infra/tls
+backups
+release-evidence
+*.zip
+*.log
