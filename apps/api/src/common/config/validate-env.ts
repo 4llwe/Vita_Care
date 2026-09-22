@@ -15,15 +15,22 @@ export function validateEnvironment() {
   strongSecret("JWT_ACCESS_SECRET");
   strongSecret("JWT_REFRESH_SECRET");
   strongSecret("ENCRYPTION_KEY");
-  const port = Number(process.env.API_PORT ?? 3001);
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
   if (!Number.isInteger(port) || port < 1 || port > 65535)
-    throw new Error("API_PORT tidak valid");
+    throw new Error("PORT/API_PORT tidak valid");
   if (process.env.NODE_ENV !== "production") return;
   const webOrigin = required("WEB_ORIGIN");
   if (webOrigin.split(",").some((x) => !x.trim().startsWith("https://")))
     throw new Error("WEB_ORIGIN produksi wajib HTTPS");
   const apiUrl = required("API_URL");
-  if (!apiUrl.startsWith("https://")) throw new Error("API_URL produksi wajib HTTPS");
+  if (!apiUrl.startsWith("https://"))
+    throw new Error("API_URL production/staging wajib HTTPS");
+
+  const appEnv = (process.env.APP_ENV ?? "production").trim().toLowerCase();
+  if (!["staging", "production"].includes(appEnv))
+    throw new Error("APP_ENV wajib staging atau production");
+  if (appEnv === "staging") return;
+
   for (const key of [
     "S3_BUCKET",
     "S3_REGION",
@@ -36,7 +43,6 @@ export function validateEnvironment() {
     "EMAIL_API_URL",
     "EMAIL_API_TOKEN",
     "EMAIL_CLINICAL_TO",
-    "REDIS_PASSWORD",
     "BACKUP_ENCRYPTION_KEY",
   ])
     required(key);

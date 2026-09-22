@@ -19,6 +19,6 @@ COPY --from=build --chown=app:app /app/prisma ./prisma
 COPY --from=build --chown=app:app /app/package.json /app/pnpm-workspace.yaml ./
 USER app
 EXPOSE 3001
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD node -e "fetch(\"http://127.0.0.1:3001/api/health/ready\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD node -e "const p=process.env.PORT||process.env.API_PORT||3001;fetch('http://127.0.0.1:'+p+'/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/main.js"]

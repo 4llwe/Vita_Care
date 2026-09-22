@@ -61,12 +61,13 @@ async function bootstrap() {
     }),
   );
   app.setGlobalPrefix("api");
-  await app.listen(Number(process.env.API_PORT ?? 3001), "0.0.0.0");
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
+  await app.listen(port, "0.0.0.0");
   console.log(
     JSON.stringify({
       event: "service_ready",
       service: "vitacare-api",
-      port: Number(process.env.API_PORT ?? 3001),
+      port,
     }),
   );
 }
