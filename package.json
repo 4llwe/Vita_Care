@@ -11,11 +11,11 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:deploy": "prisma migrate deploy",
-    "seed": "ts-node prisma/seed.ts",
+    "seed": "node -r ts-node/register/transpile-only prisma/seed.ts",
     "preflight:prod": "sh scripts/preflight-production.sh",
     "verify:menus": "node scripts/verify-menu-operations.mjs",
     "verify:prod": "pnpm preflight:prod && pnpm verify:menus && pnpm lint && pnpm test && pnpm build",
-    "backfill:booking-patient": "ts-node scripts/backfill-booking-patient.ts"
+    "backfill:booking-patient": "node -r ts-node/register/transpile-only scripts/backfill-booking-patient.ts"
   },
   "devDependencies": {
     "prisma": "^5.18.0",
