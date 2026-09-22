@@ -1,8 +1,8 @@
 import { Module } from "@nestjs/common";
-import { APP_INTERCEPTOR } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { AuditTrailInterceptor } from "./common/interceptors/audit-trail.interceptor";
 import { ScheduleModule } from "@nestjs/schedule";
-import { ThrottlerModule } from "@nestjs/throttler";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { PrismaService } from "./common/prisma/prisma.service";
 import { AuthModule } from "./modules/auth/auth.module";
 import { FindingsModule } from "./modules/findings/findings.module";
@@ -48,6 +48,7 @@ import { MenuModule } from "./modules/menu/menu.module";
   ],
   providers: [
     PrismaService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: AuditTrailInterceptor },
   ],
 })

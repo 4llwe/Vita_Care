@@ -110,6 +110,7 @@ model User {
   clinicalMessages HaHClinicalMessage[] @relation("ClinicalMessageSender")
   protocolApprovals HaHClinicalProtocolApproval[] @relation("ProtocolApprover")
   breakGlassAccesses HaHBreakGlassAccess[] @relation("BreakGlassUser")
+  patientBookings Booking[] @relation("BookingPatientAccount")
 }
 
 model Service {
@@ -151,6 +152,8 @@ model Booking {
   code           String        @unique
   patientName    String
   patientPhone   String?
+  patientUserId  String?
+  patientUser    User?         @relation("BookingPatientAccount", fields: [patientUserId], references: [id], onDelete: SetNull)
   serviceId      String
   service        Service       @relation(fields: [serviceId], references: [id])
   healthWorkerId String?
@@ -168,6 +171,9 @@ model Booking {
   record         MedicalRecord?
   invoice        Invoice?
   referrals      Referral[]
+
+  @@index([patientUserId, scheduledAt])
+  @@index([healthWorkerId, scheduledAt])
 }
 
 model MedicalRecord {

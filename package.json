@@ -14,7 +14,8 @@
     "seed": "ts-node prisma/seed.ts",
     "preflight:prod": "sh scripts/preflight-production.sh",
     "verify:menus": "node scripts/verify-menu-operations.mjs",
-    "verify:prod": "pnpm preflight:prod && pnpm verify:menus && pnpm lint && pnpm test && pnpm build"
+    "verify:prod": "pnpm preflight:prod && pnpm verify:menus && pnpm lint && pnpm test && pnpm build",
+    "backfill:booking-patient": "ts-node scripts/backfill-booking-patient.ts"
   },
   "devDependencies": {
     "prisma": "^5.18.0",

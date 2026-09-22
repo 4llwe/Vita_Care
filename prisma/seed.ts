@@ -3,7 +3,7 @@ import * as argon2 from "argon2";
 
 const prisma = new PrismaClient();
 
-// Layanan & tarif nyata Vita Care Lombok (dasar; sesuaikan dengan harga final)
+// Kandidat katalog. Seluruh layanan dibuat nonaktif sampai diverifikasi operator.
 const SERVICES = [
   {
     code: "DOC",
@@ -93,6 +93,7 @@ async function main() {
   });
 
   if (process.env.SEED_MASTER_DATA === "true") {
+    console.warn("Katalog kandidat dibuat NONAKTIF dan memerlukan persetujuan operator.");
     for (const item of SERVICES) {
       const service = await prisma.service.upsert({
         where: { code: item.code },
@@ -106,6 +107,7 @@ async function main() {
           name: item.name,
           category: item.category,
           durationMin: item.durationMin,
+          isActive: false,
         },
       });
       const existing = await prisma.tariff.findFirst({

@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "../../lib/api";
-import { setToken } from "../../lib/auth";
 
 type LoginResp = {
+  authenticated?: boolean;
   accessToken?: string;
-  requires2fa?: boolean;
-  tempToken?: string;
+  require2fa?: boolean;
+  tmpToken?: string;
 };
 
 export default function LoginPage() {
@@ -32,10 +32,9 @@ export default function LoginPage() {
         method: "POST",
         body: { email, password },
       });
-      if (r.requires2fa && r.tempToken) {
-        setTempToken(r.tempToken);
-      } else if (r.accessToken) {
-        setToken(r.accessToken);
+      if (r.require2fa && r.tmpToken) {
+        setTempToken(r.tmpToken);
+      } else if (r.authenticated || r.accessToken) {
         router.push("/dashboard");
       }
     } catch (e) {
@@ -50,12 +49,11 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const r = await api<LoginResp>("/auth/verify-2fa", {
+      const r = await api<LoginResp>("/auth/2fa", {
         method: "POST",
-        body: { tempToken, code: otp },
+        body: { tmpToken: tempToken, otp },
       });
-      if (r.accessToken) {
-        setToken(r.accessToken);
+      if (r.authenticated || r.accessToken) {
         router.push("/dashboard");
       }
     } catch (e) {

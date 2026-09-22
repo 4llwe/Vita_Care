@@ -13,25 +13,25 @@ export class MedicalRecordController {
 
   @Post()
   @Roles('HEALTH_WORKER', 'SUPER_ADMIN')
-  create(@Body() dto: CreateRecordDto) {
-    return this.records.create(dto);
+  create(@Body() dto: CreateRecordDto, @CurrentUser() user: { id: string; role: string }) {
+    return this.records.create(dto, user);
   }
 
   @Patch(':id')
   @Roles('HEALTH_WORKER', 'SUPER_ADMIN')
-  update(@Param('id') id: string, @Body() dto: Partial<CreateRecordDto>) {
-    return this.records.update(id, dto);
+  update(@Param('id') id: string, @Body() dto: Partial<CreateRecordDto>, @CurrentUser() user: { id: string; role: string }) {
+    return this.records.update(id, dto, user);
   }
 
   @Patch(':id/sign')
   @Roles('HEALTH_WORKER', 'SUPER_ADMIN')
-  sign(@Param('id') id: string, @CurrentUser() user: { id: string }) {
-    return this.records.sign(id, user.id);
+  sign(@Param('id') id: string, @CurrentUser() user: { id: string; role: string }) {
+    return this.records.sign(id, user);
   }
 
   @Get(':id')
   @Roles('HEALTH_WORKER', 'AUDITOR', 'DIRECTOR', 'SUPER_ADMIN')
-  findOne(@Param('id') id: string) {
-    return this.records.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: { id: string; role: string }) {
+    return this.records.findOne(id, user);
   }
 }

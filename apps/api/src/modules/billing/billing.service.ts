@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InvoiceStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PaymentService } from './payment.service';
@@ -56,9 +56,10 @@ export class BillingService {
   }
 
   /** Buat transaksi Midtrans untuk sebuah invoice & simpan snapToken. */
-  async pay(invoiceId: string) {
+  async pay(invoiceId: string, actor: { id: string; role: string }) {
     const inv = await this.prisma.invoice.findUnique({ where: { id: invoiceId }, include: { items: true } });
     if (!inv) throw new NotFoundException('Invoice tidak ditemukan');
+    await this.assertPatientOwnership(inv.id, actor);
     if (inv.status === InvoiceStatus.PAID) throw new BadRequestException('Invoice sudah lunas');
 
     const orderId = `${inv.code}-${Date.now()}`;
@@ -118,9 +119,9 @@ export class BillingService {
     return { ok: true, status: mapped };
   }
 
-  findOne(id: string) {
-    return this.prisma.invoice.findUniqueOrThrow({ where: { id }, include: { items: true, payments: true } });
-  }
+  async findOne(id: string, actor: { id: string; role: string }) { await this.assertPatientOwnership(id, actor); return this.prisma.invoice.findUniqueOrThrow({ where: { id }, include: { items: true, payments: true } }); }
+  myInvoices(userId: string) { return this.prisma.invoice.findMany({ where: { booking: { patientUserId: userId } }, orderBy: { issuedAt: "desc" }, include: { items: true } }); }
+  private async assertPatientOwnership(id: string, actor: { id: string; role: string }) { if (actor.role !== "PATIENT") return; const owned = await this.prisma.invoice.findFirst({ where: { id, booking: { patientUserId: actor.id } }, select: { id: true } }); if (!owned) throw new ForbiddenException("Tagihan tidak tersedia untuk akun ini"); }
 
   findAll() {
     return this.prisma.invoice.findMany({ orderBy: { issuedAt: 'desc' }, include: { items: true } });

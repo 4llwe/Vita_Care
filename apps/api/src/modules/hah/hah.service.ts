@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { Interval } from "@nestjs/schedule";
 import {
   Prisma,
@@ -40,7 +40,6 @@ import {
 import {
   ClinicalProtocolConfig,
   computeHaHClinicalScore,
-  DEFAULT_CLINICAL_PROTOCOL,
 } from "./clinical-score";
 import { validateClinicalProtocol } from "./clinical-protocol.validation";
 
@@ -71,7 +70,11 @@ export class HaHService {
 
   private async protocolConfig(): Promise<ClinicalProtocolConfig> {
     const row = await this.activeProtocol();
-    if (!row) return DEFAULT_CLINICAL_PROTOCOL;
+    if (!row) {
+      throw new ServiceUnavailableException(
+        "Protokol klinis aktif belum disahkan. Observasi otomatis dinonaktifkan.",
+      );
+    }
     return validateClinicalProtocol(
       row.thresholds as Record<string, unknown>,
       row.responseSla as Record<string, unknown>,

@@ -26,6 +26,7 @@ jobs:
       - run: test -f pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm prisma:generate
+      - run: sh scripts/check-migrations.sh
       - run: pnpm prisma migrate deploy
       - run: pnpm verify:menus
       - run: pnpm lint

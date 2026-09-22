@@ -15,7 +15,7 @@ export class BookingController {
   constructor(private readonly booking: BookingService) {}
 
   @Post()
-  @Roles('COORDINATOR', 'SUPER_ADMIN', 'PATIENT')
+  @Roles('COORDINATOR', 'SUPER_ADMIN')
   create(@Body() dto: CreateBookingDto) {
     return this.booking.create(dto);
   }
@@ -25,6 +25,10 @@ export class BookingController {
   findAll() {
     return this.booking.findAll();
   }
+
+  @Get('assigned/me')
+  @Roles('HEALTH_WORKER', 'SUPER_ADMIN')
+  assignedToMe(@CurrentUser() user: { id: string }) { return this.booking.assignedToMe(user.id); }
 
   // ----- Portal Pasien -----
   @Post('me')
@@ -65,14 +69,14 @@ export class BookingController {
 
   @Patch(':id/status/:status')
   @Roles('COORDINATOR', 'SUPER_ADMIN', 'HEALTH_WORKER')
-  changeStatus(@Param('id') id: string, @Param('status') status: BookingStatus) {
-    return this.booking.changeStatus(id, status);
+  changeStatus(@Param('id') id: string, @Param('status') status: BookingStatus, @CurrentUser() user: { id: string; role: string }) {
+    return this.booking.changeStatus(id, status, user);
   }
 
   // Ping lokasi nakes saat "Dalam Perjalanan" (dipanggil berkala dari perangkat nakes).
   @Patch(':id/location')
   @Roles('HEALTH_WORKER', 'COORDINATOR', 'SUPER_ADMIN')
-  updateLocation(@Param('id') id: string, @Body() dto: UpdateLocationDto) {
-    return this.booking.updateLocation(id, dto);
+  updateLocation(@Param('id') id: string, @Body() dto: UpdateLocationDto, @CurrentUser() user: { id: string; role: string }) {
+    return this.booking.updateLocation(id, dto, user);
   }
 }

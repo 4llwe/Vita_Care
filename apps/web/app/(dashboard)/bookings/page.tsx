@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../../../lib/api";
 import { getToken } from "../../../lib/auth";
+import { fetchMe, type Session } from "../../../lib/session";
 import { tanggalJam } from "../../../lib/format";
 import type { Booking } from "../../../lib/types";
 import { StatusBadge } from "../../../components/status-badge";
@@ -15,12 +16,16 @@ export default function BookingsPage() {
   const [rows, setRows] = useState<Booking[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
 
-  const load = useCallback(() => {
-    api<Booking[]>("/bookings", { token: getToken() })
-      .then(setRows)
-      .catch((e) => setError(e.message));
-  }, []);
+  const load = useCallback(async () => {
+    try {
+      const me = session ?? (await fetchMe());
+      if (!session) setSession(me);
+      const endpoint = me.role === "PATIENT" || me.role === "CAREGIVER" ? "/bookings/me" : me.role === "HEALTH_WORKER" ? "/bookings/assigned/me" : "/bookings";
+      setRows(await api<Booking[]>(endpoint, { token: getToken() }));
+    } catch (e) { setError(e instanceof Error ? e.message : "Gagal memuat jadwal"); }
+  }, [session]);
 
   useEffect(() => {
     load();
@@ -32,7 +37,7 @@ export default function BookingsPage() {
         <h1 className="text-xl font-extrabold text-slate-800">
           Pemesanan Kunjungan
         </h1>
-        <AddButton onClick={() => setOpen(true)} label="Booking baru" />
+        {session?.role === "COORDINATOR" || session?.role === "SUPER_ADMIN" ? <AddButton onClick={() => setOpen(true)} label="Booking baru" /> : null}
       </div>
 
       {error ? (
@@ -81,12 +86,9 @@ export default function BookingsPage() {
                     <StatusBadge status={b.status} />
                   </td>
                   <td className="px-4 py-3">
-                    <BookingActions
-                      id={b.id}
-                      status={b.status}
-                      zone={b.zone}
-                      onChanged={load}
-                    />
+                    {session?.role === "COORDINATOR" || session?.role === "SUPER_ADMIN" || session?.role === "HEALTH_WORKER" ? <BookingActions
+                      id={b.id} status={b.status} zone={b.zone} onChanged={load}
+                    /> : <span className="text-xs text-slate-400">Lihat status</span>}
                   </td>
                 </tr>
               ))}

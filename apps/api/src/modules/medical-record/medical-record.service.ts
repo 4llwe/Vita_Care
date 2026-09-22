@@ -7,7 +7,8 @@ import { computeEws } from './ews';
 export class MedicalRecordService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateRecordDto) {
+  async create(dto: CreateRecordDto, actor: { id: string; role: string }) {
+    await this.assertBookingAccess(dto.bookingId, actor);
     const ews = computeEws(dto);
     return this.prisma.medicalRecord.create({
       data: {
@@ -31,9 +32,10 @@ export class MedicalRecordService {
   }
 
   /** Rekam medis yang sudah dikunci tidak boleh diubah (integritas data). */
-  async update(id: string, dto: Partial<CreateRecordDto>) {
+  async update(id: string, dto: Partial<CreateRecordDto>, actor: { id: string; role: string }) {
     const rec = await this.prisma.medicalRecord.findUnique({ where: { id } });
     if (!rec) throw new NotFoundException('Rekam medis tidak ditemukan');
+    await this.assertBookingAccess(rec.bookingId, actor);
     if (rec.locked) throw new ForbiddenException('Rekam medis sudah dikunci dan tidak dapat diubah');
 
     const merged = { ...rec, ...dto } as CreateRecordDto;
@@ -45,17 +47,17 @@ export class MedicalRecordService {
   }
 
   /** Tanda tangan digital + kunci rekam medis (tidak dapat diubah lagi). */
-  async sign(id: string, signerId: string) {
+  async sign(id: string, actor: { id: string; role: string }) {
     const rec = await this.prisma.medicalRecord.findUnique({ where: { id } });
     if (!rec) throw new NotFoundException('Rekam medis tidak ditemukan');
+    await this.assertBookingAccess(rec.bookingId, actor);
     if (rec.locked) throw new BadRequestException('Rekam medis sudah ditandatangani');
     return this.prisma.medicalRecord.update({
       where: { id },
-      data: { signedById: signerId, signedAt: new Date(), locked: true },
+      data: { signedById: actor.id, signedAt: new Date(), locked: true },
     });
   }
 
-  findOne(id: string) {
-    return this.prisma.medicalRecord.findUniqueOrThrow({ where: { id }, include: { signedBy: true } });
-  }
+  async findOne(id: string, actor: { id: string; role: string }) { const record = await this.prisma.medicalRecord.findUniqueOrThrow({ where: { id }, include: { signedBy: true } }); await this.assertBookingAccess(record.bookingId, actor); return record; }
+  private async assertBookingAccess(bookingId: string, actor: { id: string; role: string }) { if (actor.role !== "HEALTH_WORKER") return; const allowed = await this.prisma.booking.findFirst({ where: { id: bookingId, healthWorker: { userId: actor.id, isActive: true } }, select: { id: true } }); if (!allowed) throw new ForbiddenException("Anda tidak ditugaskan pada kunjungan ini"); }
 }

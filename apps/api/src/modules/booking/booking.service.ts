@@ -48,9 +48,10 @@ export class BookingService {
   }
 
   /** Validasi transisi & ubah status. */
-  async changeStatus(id: string, next: BookingStatus) {
+  async changeStatus(id: string, next: BookingStatus, actor?: { id: string; role: string }) {
     const bk = await this.prisma.booking.findUnique({ where: { id } });
     if (!bk) throw new NotFoundException('Booking tidak ditemukan');
+    await this.requireAssignedWorker(bk.healthWorkerId, actor);
     if (!BOOKING_TRANSITIONS[bk.status].includes(next)) {
       throw new BadRequestException(`Transisi ${bk.status} -> ${next} tidak valid`);
     }
@@ -121,6 +122,7 @@ export class BookingService {
         code,
         patientName: user.name,
         patientPhone: user.phone,
+        patientUserId: user.id,
         serviceId: dto.serviceId,
         zone: dto.zone,
         addressLat: dto.lat,
@@ -132,19 +134,13 @@ export class BookingService {
     });
   }
 
-  /** Filter kepemilikan booking untuk pasien (berdasarkan telepon/nama akun). */
-  private async ownershipWhere(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('Pengguna tidak ditemukan');
-    const or: Array<Record<string, unknown>> = [{ patientName: user.name }];
-    if (user.phone) or.push({ patientPhone: user.phone });
-    return { OR: or };
-  }
+  /** Kepemilikan pasien memakai immutable user ID, bukan nama/telepon. */
+  private ownershipWhere(userId: string) { return { patientUserId: userId }; }
 
   /** Daftar booking milik pasien yang sedang login. */
   async myBookings(userId: string) {
     return this.prisma.booking.findMany({
-      where: await this.ownershipWhere(userId),
+      where: this.ownershipWhere(userId),
       orderBy: { scheduledAt: 'desc' },
       include: { service: true, healthWorker: true },
     });
@@ -152,7 +148,7 @@ export class BookingService {
 
   /** Detail booking milik pasien (untuk pelacakan kunjungan). */
   async myBooking(id: string, userId: string) {
-    const where = await this.ownershipWhere(userId);
+    const where = this.ownershipWhere(userId);
     const bk = await this.prisma.booking.findFirst({
       where: { AND: [{ id }, where] },
       include: {
@@ -172,9 +168,10 @@ export class BookingService {
   }
 
   /** Nakes membagikan posisi terkini saat menuju lokasi pasien (hanya DALAM_PERJALANAN). */
-  async updateLocation(id: string, dto: UpdateLocationDto) {
+  async updateLocation(id: string, dto: UpdateLocationDto, actor?: { id: string; role: string }) {
     const bk = await this.prisma.booking.findUnique({ where: { id } });
     if (!bk) throw new NotFoundException('Booking tidak ditemukan');
+    await this.requireAssignedWorker(bk.healthWorkerId, actor);
     if (bk.status !== BookingStatus.DALAM_PERJALANAN) {
       throw new BadRequestException('Lokasi hanya dapat dibagikan saat status Dalam Perjalanan');
     }
@@ -184,4 +181,11 @@ export class BookingService {
       select: { id: true, workerLat: true, workerLng: true, workerLocAt: true },
     });
   }
+  assignedToMe(userId: string) { return this.prisma.booking.findMany({ where: { healthWorker: { userId } }, orderBy: { scheduledAt: "desc" }, include: { service: true, healthWorker: true } }); }
+  private async requireAssignedWorker(healthWorkerId: string | null, actor?: { id: string; role: string }) {
+    if (!actor || actor.role !== "HEALTH_WORKER") return;
+    const assigned = healthWorkerId ? await this.prisma.healthWorker.findFirst({ where: { id: healthWorkerId, userId: actor.id, isActive: true }, select: { id: true } }) : null;
+    if (!assigned) throw new BadRequestException("Booking tidak ditugaskan kepada Anda");
+  }
+
 }
