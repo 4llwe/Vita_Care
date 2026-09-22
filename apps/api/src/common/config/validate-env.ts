@@ -15,7 +15,7 @@ export function validateEnvironment() {
   strongSecret("JWT_ACCESS_SECRET");
   strongSecret("JWT_REFRESH_SECRET");
   strongSecret("ENCRYPTION_KEY");
-  const port = Number(process.env.API_PORT ?? 3001);
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
   if (!Number.isInteger(port) || port < 1 || port > 65535)
     throw new Error("API_PORT tidak valid");
   if (process.env.NODE_ENV !== "production") return;
