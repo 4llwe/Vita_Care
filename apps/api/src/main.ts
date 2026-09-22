@@ -5,7 +5,7 @@ import type { NextFunction, Request, Response } from "express";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { validateEnvironment } from "./common/config/validate-env";
-async function bootstrap() {
+async function createApp() {
   validateEnvironment();
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.enableShutdownHooks();
@@ -61,14 +61,41 @@ async function bootstrap() {
     }),
   );
   app.setGlobalPrefix("api");
-  const port = Number(process.env.PORT?.trim() || process.env.API_PORT?.trim() || "3001");
-  await app.listen(port);
-  console.log(
-    JSON.stringify({
-      event: "service_ready",
-      service: "vitacare-api",
-      port,
-    }),
-  );
+
+  await app.init();
+  return app;
 }
-bootstrap();
+
+let appPromise: ReturnType<typeof createApp> | undefined;
+
+export default async function handler(req: Request, res: Response) {
+  const app = await (appPromise ??= createApp());
+  const server = app.getHttpAdapter().getInstance();
+  return server(req, res);
+}
+
+if (!process.env.VERCEL) {
+  void createApp()
+    .then(async (app) => {
+      const port = Number(
+        process.env.PORT?.trim() || process.env.API_PORT?.trim() || "3001",
+      );
+      await app.listen(port);
+      console.log(
+        JSON.stringify({
+          event: "service_ready",
+          service: "vitacare-api",
+          port,
+        }),
+      );
+    })
+    .catch((error) => {
+      console.error(
+        JSON.stringify({
+          event: "bootstrap_failed",
+          message: error instanceof Error ? error.message : "unknown",
+        }),
+      );
+      process.exit(1);
+    });
+}
