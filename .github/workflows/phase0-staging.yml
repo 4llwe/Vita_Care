@@ -13,6 +13,7 @@ on:
         default: false
   pull_request:
     branches: [vitacare-hah-v1.3, main]
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   contents: read
@@ -108,7 +109,14 @@ jobs:
           retention-days: 30
 
   authoritative-db-readonly:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_authoritative_db_checks }}
+    if: >-
+      ${{
+        (github.event_name == 'workflow_dispatch' &&
+         inputs.run_authoritative_db_checks) ||
+        (github.event_name == 'pull_request' &&
+         github.event.action == 'labeled' &&
+         github.event.label.name == 'run-authoritative-db-readonly')
+      }}
     runs-on: ubuntu-latest
     environment: staging
     env:
