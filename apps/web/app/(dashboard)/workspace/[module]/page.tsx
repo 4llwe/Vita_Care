@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../../../lib/api";
 import { getToken } from "../../../../lib/auth";
@@ -47,8 +48,9 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="rounded-xl bg-slate-50 p-4 text-slate-500">{children}</p>;
 }
 
-export default function WorkspacePage({ params }: { params: { module: string } }) {
-  const title = labels[params.module] ?? params.module.replace(/-/g, " ");
+export default function WorkspacePage() {
+  const { module } = useParams<{ module: string }>();
+  const title = labels[module] ?? module.replace(/-/g, " ");
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [episodeId, setEpisodeId] = useState("");
   const [detail, setDetail] = useState<any>(null);
@@ -161,7 +163,7 @@ export default function WorkspacePage({ params }: { params: { module: string } }
       {episodes.length > 0 && !detail && (
         <div className="medical-card text-sm text-slate-500">Memuat data klinis…</div>
       )}
-      {detail && medicationModules.has(params.module) && (
+      {detail && medicationModules.has(module) && (
         <div className="grid gap-4 lg:grid-cols-2">
           {(detail.medicationOrders ?? []).length ? (
             detail.medicationOrders.map((m: any) => (
@@ -187,7 +189,7 @@ export default function WorkspacePage({ params }: { params: { module: string } }
           )}
         </div>
       )}
-      {detail && diagnosticModules.has(params.module) && (
+      {detail && diagnosticModules.has(module) && (
         <div className="grid gap-4 lg:grid-cols-2">
           {(detail.diagnosticOrders ?? []).length ? (
             detail.diagnosticOrders.map((o: any) => (
@@ -216,7 +218,7 @@ export default function WorkspacePage({ params }: { params: { module: string } }
           )}
         </div>
       )}
-      {detail && careModules.has(params.module) && (
+      {detail && careModules.has(module) && (
         <Card title="Rencana Perawatan Individu">
           {detail.carePlan ? (
             <dl className="grid gap-4 md:grid-cols-2">
@@ -281,7 +283,7 @@ export default function WorkspacePage({ params }: { params: { module: string } }
           )}
         </Card>
       )}
-      {detail && timelineModules.has(params.module) && (
+      {detail && timelineModules.has(module) && (
         <Card title="Timeline rekam medis">
           {timeline.length ? (
             <ol className="space-y-3">
@@ -302,7 +304,7 @@ export default function WorkspacePage({ params }: { params: { module: string } }
           )}
         </Card>
       )}
-      {detail && params.module === "profil-pasien" && (
+      {detail && module === "profil-pasien" && (
         <Card title="Identitas pasien">
           <dl className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -324,7 +326,7 @@ export default function WorkspacePage({ params }: { params: { module: string } }
           </dl>
         </Card>
       )}
-      {detail && params.module === "keluarga" && (
+      {detail && module === "keluarga" && (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card title="Keluarga & caregiver">
             <p>
@@ -401,7 +403,7 @@ export default function WorkspacePage({ params }: { params: { module: string } }
       )}
       {detail &&
         ["telekonsultasi", "edukasi-pasien", "perawatan-luka"].includes(
-          params.module,
+          module,
         ) && (
           <Card title={title}>
             <p>
@@ -421,7 +423,7 @@ export default function WorkspacePage({ params }: { params: { module: string } }
             </div>
           </Card>
         )}
-      {detail && ["pengguna", "pengaturan"].includes(params.module) && (
+      {detail && ["pengguna", "pengaturan"].includes(module) && (
         <Card title={title}>
           <p>
             Pengelolaan administratif dipusatkan agar perubahan pengguna, tenaga

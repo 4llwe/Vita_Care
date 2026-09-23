@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "../../../../lib/api";
 import { getToken } from "../../../../lib/auth";
@@ -25,12 +26,8 @@ const RESULTS: Array<{ value: ComplianceResult; label: string; cls: string }> =
 
 type Draft = Record<string, { result: ComplianceResult; note: string }>;
 
-export default function AuditDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const { id } = params;
+export default function AuditDetailPage() {
+  const { id } = useParams<{ id: string }>();
   const [exec, setExec] = useState<AuditExecution | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>({});
