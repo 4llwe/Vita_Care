@@ -1,16 +1,1 @@
-"use client";
-
-const KEY = "vitacare.token";
-
-export function getToken(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  return window.localStorage.getItem(KEY) ?? undefined;
-}
-
-export function setToken(token: string) {
-  window.localStorage.setItem(KEY, token);
-}
-
-export function clearToken() {
-  window.localStorage.removeItem(KEY);
-}
+"use client";const KEY="vitacare.token";export function getToken(){if(typeof window==="undefined")return undefined;return window.localStorage.getItem(KEY)??undefined;}export function setToken(_token:string){if(typeof window!=="undefined")window.localStorage.removeItem(KEY);}export function clearToken(){if(typeof window!=="undefined")window.localStorage.removeItem(KEY);}

@@ -1,0 +1,143 @@
+name: Phase 0 staging evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_authoritative_db_checks:
+        description: "Run read-only checks against GitHub Environment staging"
+        type: boolean
+        default: false
+      run_backfill_dry_run:
+        description: "Validate BOOKING_PATIENT_MAPPING_B64 without writing"
+        type: boolean
+        default: false
+  pull_request:
+    branches: [vitacare-hah-v1.3, main]
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-verification:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vitacare
+          POSTGRES_PASSWORD: vitacare_ci_only
+          POSTGRES_DB: vitacare_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U vitacare -d vitacare_ci"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://vitacare:vitacare_ci_only@localhost:5432/vitacare_ci
+      JWT_ACCESS_SECRET: "ci-access-secret-0123456789abcdef"
+      JWT_REFRESH_SECRET: "ci-refresh-secret-0123456789abcdef"
+      ENCRYPTION_KEY: "ci-encryption-key-0123456789abcdef"
+      WEB_ORIGIN: http://127.0.0.1:3000
+      API_URL: http://127.0.0.1:3001
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+      E2E_WEB_URL: http://127.0.0.1:3000
+      E2E_API_URL: http://127.0.0.1:3001
+      SEED_ADMIN_EMAIL: ci-admin@vitacare.invalid
+      SEED_ADMIN_PASSWORD: CI-only-password-2026!
+      SEED_MASTER_DATA: "false"
+      E2E_ADMIN_EMAIL: ci-admin@vitacare.invalid
+      E2E_ADMIN_PASSWORD: CI-only-password-2026!
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.0.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - name: Runtime evidence
+        run: |
+          mkdir -p release-evidence
+          node --version | tee release-evidence/node-version.txt
+          pnpm --version | tee release-evidence/pnpm-version.txt
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma:generate
+      - run: pnpm exec prisma validate
+      - name: Generate and statically review squashed baseline preview
+        run: sh scripts/create-baseline-migration.sh
+      - name: Build isolated database from reviewed migration history
+        run: pnpm exec prisma migrate deploy
+      - name: Prove migration deployment is idempotent
+        run: pnpm exec prisma migrate deploy
+      - name: Prove migration history is current
+        run: pnpm exec prisma migrate status
+      - run: pnpm seed
+      - name: Negative authorization boundary tests
+        run: pnpm --filter api test -- --runInBand authorization-boundaries.spec.ts
+      - name: Full API unit tests
+        run: pnpm --filter api test -- --runInBand
+      - name: Lint and production build
+        run: |
+          pnpm lint
+          pnpm build
+      - name: Install Playwright Chromium
+        run: pnpm --filter e2e install:browsers
+      - name: Start API and web
+        run: |
+          node apps/api/dist/main.js > release-evidence/api.log 2>&1 & echo $! > /tmp/vc-api.pid
+          pnpm --filter web start > release-evidence/web.log 2>&1 & echo $! > /tmp/vc-web.pid
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:3001/api/health/ready >/dev/null && curl -fsS http://127.0.0.1:3000 >/dev/null && exit 0
+            sleep 2
+          done
+          echo "Services did not become ready" >&2; exit 1
+      - name: Playwright E2E
+        run: pnpm --filter e2e test
+      - name: Capture schema and migration evidence
+        if: always()
+        run: |
+          pnpm exec prisma migrate status > release-evidence/migrate-status.txt 2>&1 || true
+          git diff --exit-code > release-evidence/generated-diff.txt 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase0-staging-evidence
+          path: |
+            release-evidence/
+            apps/e2e/playwright-report/
+          retention-days: 30
+
+  authoritative-db-readonly:
+    if: >-
+      ${{
+        (github.event_name == 'workflow_dispatch' &&
+         inputs.run_authoritative_db_checks) ||
+        (github.event_name == 'pull_request' &&
+         github.event.action == 'labeled' &&
+         github.event.label.name == 'run-authoritative-db-readonly')
+      }}
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.0.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: test -n "$DATABASE_URL"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma:generate
+      - run: pnpm exec prisma validate
+      - name: Read-only migration status
+        run: pnpm exec prisma migrate status
+      - name: Backfill validation only
+        if: ${{ inputs.run_backfill_dry_run }}
+        env:
+          BOOKING_PATIENT_MAPPING_B64: ${{ secrets.BOOKING_PATIENT_MAPPING_B64 }}
+        run: |
+          test -n "$BOOKING_PATIENT_MAPPING_B64"
+          umask 077
+          printf '%s' "$BOOKING_PATIENT_MAPPING_B64" | base64 --decode > /tmp/booking-patient.csv
+          pnpm backfill:booking-patient --mapping=/tmp/booking-patient.csv
+          rm -f /tmp/booking-patient.csv

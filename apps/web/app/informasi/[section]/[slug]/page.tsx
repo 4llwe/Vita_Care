@@ -81,18 +81,19 @@ function actionFor(section: string, slug: string) {
 export default async function InfoPage({
   params,
 }: {
-  params: { section: string; slug: string };
+  params: Promise<{ section: string; slug: string }>;
 }) {
-  const fallback = findPublicItem(params.section, params.slug);
-  const remote = await api<any>(`/menus/${params.section}/${params.slug}`, {
+  const { section, slug } = await params;
+  const fallback = findPublicItem(section, slug);
+  const remote = await api<any>(`/menus/${section}/${slug}`, {
     cache: "no-store",
   }).catch(() => null);
   if (!remote && !fallback) notFound();
   const group = remote?.group ?? fallback!.group;
   const itemRecord = remote?.item ?? { label: fallback!.item };
   const item = itemRecord.label;
-  const action = actionFor(group.key, params.slug);
-  const operation = operationFromItem(itemRecord, group.key, params.slug);
+  const action = actionFor(group.key, slug);
+  const operation = operationFromItem(itemRecord, group.key, slug);
   const guides = sectionGuides[group.key] ?? [
     "Informasi layanan",
     "Alur dan persyaratan",
@@ -132,7 +133,7 @@ export default async function InfoPage({
             </div>
             <OperationalActionPanel
               section={group.key}
-              slug={params.slug}
+              slug={slug}
               operation={operation}
             />
           </article>

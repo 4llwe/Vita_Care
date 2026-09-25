@@ -2,10 +2,10 @@ import Link from "next/link";
 import { PublicHeader } from "../components/public-header";
 import { PublicFooter } from "../components/public-footer";
 const services = [
-  "Kunjungan dokter dan keperawatan akut",
-  "Monitoring klinis dan early warning",
-  "Farmasi, diagnostik, serta alat medis",
-  "Rehabilitasi dan transisi pascarawat",
+  "Konsultasi kebutuhan pelayanan di rumah",
+  "Kunjungan tenaga kesehatan terjadwal",
+  "Pemantauan dan dokumentasi pelayanan",
+  "Koordinasi tindak lanjut pasien",
 ];
 export default function HomePage() {
   return (
@@ -20,7 +20,7 @@ export default function HomePage() {
                 Hospital-level care at home
               </p>
               <h1 className="mt-5 max-w-4xl text-4xl font-black leading-tight tracking-tight text-white sm:text-6xl">
-                Perawatan akut terkoordinasi, aman, dan manusiawi di rumah.
+                Pelayanan kesehatan di rumah yang terkoordinasi dan berpusat pada pasien.
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
                 Vita Care menghubungkan pasien, keluarga, dokter, perawat,
@@ -134,10 +134,10 @@ export default function HomePage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               {[
-                ["24/7", "Kesiapan koordinasi"],
-                ["≤15 menit", "Target respons kritis"],
-                ["100%", "Mutasi klinis diaudit"],
-                ["1 alur", "Admission–discharge"],
+                ["Admin", "Konfigurasi layanan"],
+                ["Scoped", "Akses sesuai kewenangan"],
+                ["Audit", "Aktivitas sensitif tercatat"],
+                ["Terpadu", "Permintaan–tindak lanjut"],
               ].map(([a, b]) => (
                 <div
                   key={b}

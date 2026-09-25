@@ -11,3 +11,8 @@ prisma/migrations/dev.db*
 infra/tls/
 backups/
 release-evidence/
+
+# Patient ownership reconciliation inputs/evidence
+backfill/*.csv
+release-evidence/*.sql
+release-evidence/*.json

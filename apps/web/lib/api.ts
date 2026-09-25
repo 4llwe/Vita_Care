@@ -1,35 +1,4 @@
-// Klien API ringan untuk Vita Care. Menyertakan bearer token bila ada.
-const API_URL =
-  process.env.API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:3001";
-
-export type ApiOptions = {
-  token?: string;
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
-  body?: unknown;
-  cache?: RequestCache;
-};
-
-export async function api<T = unknown>(
-  path: string,
-  opts: ApiOptions = {},
-): Promise<T> {
-  const res = await fetch(`${API_URL}/api${path}`, {
-    method: opts.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
-    },
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-    cache: opts.cache ?? "no-store",
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${text || res.statusText}`);
-  }
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
-}
-
-export { API_URL };
+const API_URL=process.env.API_URL??process.env.NEXT_PUBLIC_API_URL??"http://localhost:3001";
+export type ApiOptions={token?:string;method?:"GET"|"POST"|"PATCH"|"DELETE";body?:unknown;cache?:RequestCache;_retried?:boolean};
+function friendly(status:number,p:any){const m=Array.isArray(p?.message)?p.message.join(" "):p?.message;if(typeof m==="string"&&m.length<240)return m;if(status===401)return"Sesi Anda telah berakhir. Silakan masuk kembali.";if(status===403)return"Anda tidak memiliki izin untuk tindakan ini.";if(status===404)return"Data yang diminta tidak ditemukan.";if(status>=500)return"Layanan sedang mengalami gangguan. Silakan coba lagi.";return"Permintaan tidak dapat diproses.";}
+export async function api<T=unknown>(path:string,o:ApiOptions={}):Promise<T>{const r=await fetch(`${API_URL}/api${path}`,{method:o.method??"GET",credentials:"include",headers:{"Content-Type":"application/json",...(o.token?{Authorization:`Bearer ${o.token}`}:{})},body:o.body?JSON.stringify(o.body):undefined,cache:o.cache??"no-store"});if(r.status===401&&!o.token&&!o._retried&&path!=="/auth/refresh"){const x=await fetch(`${API_URL}/api/auth/refresh`,{method:"POST",credentials:"include"});if(x.ok)return api<T>(path,{...o,_retried:true});}if(!r.ok)throw new Error(friendly(r.status,await r.json().catch(()=>null)));if(r.status===204)return undefined as T;return r.json() as Promise<T>;}export{API_URL};

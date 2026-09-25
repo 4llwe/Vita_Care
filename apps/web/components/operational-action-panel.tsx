@@ -18,7 +18,8 @@ export function OperationalActionPanel({
     e.preventDefault();
     setBusy(true);
     setStatus("");
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const f = new FormData(form);
     try {
       const result = await api<{ id: string }>("/public-requests", {
         method: "POST",
@@ -36,7 +37,7 @@ export function OperationalActionPanel({
         },
       });
       setStatus(`Permintaan diterima. Nomor tiket: ${result.id}`);
-      e.currentTarget.reset();
+      form.reset();
     } catch (x) {
       setStatus(x instanceof Error ? x.message : "Permintaan gagal dikirim");
     } finally {
