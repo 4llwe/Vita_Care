@@ -4,6 +4,7 @@ const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
 
 export default defineConfig({
   testDir: './tests',
+  globalSetup: './global-setup.ts',
   timeout: 30_000,
   expect: { timeout: 5_000 },
   fullyParallel: true,

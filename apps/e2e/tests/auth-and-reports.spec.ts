@@ -1,5 +1,5 @@
 import { test, expect, request as playwrightRequest } from '@playwright/test';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, API_URL, loginApi } from './helpers';
+import { API_URL, authenticatePage, invalidateAuthCache, loginApi } from './helpers';
 
 test.describe('Autentikasi & export laporan (API)', () => {
   test.describe.configure({ mode: 'serial' });
@@ -27,7 +27,7 @@ test.describe('Autentikasi & export laporan (API)', () => {
 
   test('session list is owner-scoped and targeted logout revokes the current session', async () => {
     const request = await playwrightRequest.newContext();
-    const token = await loginApi(request);
+    const token = await loginApi(request, { fresh: true, isolated: true });
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()) as { sid: string };
 
     const list = await request.get(`${API_URL}/api/auth/sessions`, {
@@ -46,12 +46,13 @@ test.describe('Autentikasi & export laporan (API)', () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(after.status()).toBe(401);
+    invalidateAuthCache();
     await request.dispose();
   });
 
   test('logout-all revokes the access session family', async () => {
     const request = await playwrightRequest.newContext();
-    const token = await loginApi(request);
+    const token = await loginApi(request, { fresh: true, isolated: true });
     const logout = await request.post(`${API_URL}/api/auth/logout-all`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -61,12 +62,13 @@ test.describe('Autentikasi & export laporan (API)', () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(after.status()).toBe(401);
+    invalidateAuthCache();
     await request.dispose();
   });
 
   test('refresh rotates the cookie and current logout invalidates it', async () => {
     const request = await playwrightRequest.newContext();
-    await loginApi(request);
+    await loginApi(request, { fresh: true, isolated: true });
     const refreshed = await request.post(`${API_URL}/api/auth/refresh`);
     expect(refreshed.status()).toBe(200);
 
@@ -74,12 +76,13 @@ test.describe('Autentikasi & export laporan (API)', () => {
     expect(logout.status()).toBe(204);
     const after = await request.post(`${API_URL}/api/auth/refresh`);
     expect(after.status()).toBe(401);
+    invalidateAuthCache();
     await request.dispose();
   });
 
   test('reusing a rotated refresh cookie revokes the complete family', async () => {
     const request = await playwrightRequest.newContext();
-    await loginApi(request);
+    await loginApi(request, { fresh: true, isolated: true });
     const state = await request.storageState();
     const staleCookie = state.cookies.find((cookie) => cookie.name === 'vc_refresh');
     expect(staleCookie).toBeTruthy();
@@ -96,6 +99,7 @@ test.describe('Autentikasi & export laporan (API)', () => {
 
     const familyAfterReuse = await request.post(`${API_URL}/api/auth/refresh`);
     expect(familyAfterReuse.status()).toBe(401);
+    invalidateAuthCache();
     await request.dispose();
   });
 
@@ -114,13 +118,10 @@ test.describe('Autentikasi & export laporan (API)', () => {
     await request.dispose();
   });
 
-  test('browser transparently refreshes an invalid access cookie', async ({ page, context }) => {
+  test('browser transparently refreshes an invalid access cookie', async ({ page, context, request }) => {
     const webUrl = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
-    await page.goto(`${webUrl}/login`);
-    await page.locator('input[type="email"]').fill(ADMIN_EMAIL);
-    await page.locator('input[type="password"]').fill(ADMIN_PASSWORD);
-    await page.getByRole('button', { name: 'Masuk' }).click();
-    await expect(page).toHaveURL(/dashboard/);
+    await authenticatePage(page, request);
+    await page.goto(`${webUrl}/dashboard`);
 
     const accessCookie = (await context.cookies()).find((cookie) => cookie.name === 'vc_access');
     expect(accessCookie).toBeTruthy();

@@ -49,6 +49,8 @@ jobs:
       SEED_MASTER_DATA: "false"
       E2E_ADMIN_EMAIL: ci-admin@vitacare.invalid
       E2E_ADMIN_PASSWORD: CI-only-password-2026!
+      E2E_AUTH_EMAIL: ci-auth-isolated@vitacare.invalid
+      E2E_AUTH_PASSWORD: CI-only-password-2026!
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
