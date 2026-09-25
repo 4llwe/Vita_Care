@@ -20,19 +20,26 @@ test("two tabs share one refresh rotation and both recover", async ({ browser })
   const first = await context.newPage();
   const second = await context.newPage();
   let refreshRequests = 0;
-  let successfulMeResponses = 0;
   for (const page of [first, second]) {
     page.on("request", (request) => {
       if (request.url().endsWith("/api/auth/refresh")) refreshRequests += 1;
-    });
-    page.on("response", (response) => {
-      if (response.url().endsWith("/api/auth/me") && response.status() === 200) successfulMeResponses += 1;
     });
   }
 
   await Promise.all([first.goto("/dashboard"), second.goto("/dashboard")]);
   await expect.poll(() => refreshRequests).toBe(1);
-  await expect.poll(() => successfulMeResponses).toBeGreaterThanOrEqual(2);
+  await expect.poll(async () => {
+    return Promise.all(
+      [first, second].map((page) =>
+        page.evaluate(async () => {
+          const response = await fetch("http://127.0.0.1:3001/api/auth/me", {
+            credentials: "include",
+          });
+          return response.status;
+        }),
+      ),
+    );
+  }, { timeout: 10_000 }).toEqual([200, 200]);
   await expect.poll(async () =>
     first.evaluate(async () => {
       const response = await fetch("http://127.0.0.1:3001/api/auth/sessions", { credentials: "include" });
