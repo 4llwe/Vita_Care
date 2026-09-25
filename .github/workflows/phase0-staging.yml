@@ -64,15 +64,13 @@ jobs:
       - run: pnpm exec prisma validate
       - name: Generate and statically review squashed baseline preview
         run: sh scripts/create-baseline-migration.sh
-      - name: Build isolated database from authoritative schema
-        run: pnpm exec prisma db push --force-reset --skip-generate
+      - name: Build isolated database from reviewed migration history
+        run: pnpm exec prisma migrate deploy
+      - name: Prove migration deployment is idempotent
+        run: pnpm exec prisma migrate deploy
+      - name: Prove migration history is current
+        run: pnpm exec prisma migrate status
       - run: pnpm seed
-      - name: Seed isolated navigation menu fixtures
-        run: |
-          set -euo pipefail
-          grep -E '^INSERT INTO "(NavigationMenuGroup|NavigationMenuItem)"' prisma/migrations/20260925_dynamic_menu_cms/migration.sql > /tmp/menu-seed.sql
-          test -s /tmp/menu-seed.sql
-          pnpm exec prisma db execute --schema=prisma/schema.prisma --file=/tmp/menu-seed.sql
       - name: Negative authorization boundary tests
         run: pnpm --filter api test -- --runInBand authorization-boundaries.spec.ts
       - name: Full API unit tests

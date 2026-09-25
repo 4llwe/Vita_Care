@@ -10,4 +10,7 @@ out=release-evidence/baseline-current-preview.sql
 [ -s "$out" ] || { echo 'Baseline preview kosong.' >&2; exit 1; }
 ./node_modules/.bin/prisma validate
 python3 scripts/review-baseline.py --sql "$out"
-echo "Baseline preview dibuat di $out. Jangan pindahkan ke prisma/migrations sebelum review terhadap _prisma_migrations/database authoritative."
+committed=prisma/migrations/20260920_hah_baseline/migration.sql
+[ -s "$committed" ] || { echo "Baseline committed tidak ditemukan: $committed" >&2; exit 1; }
+cmp -s "$out" "$committed" || { echo "Baseline committed berbeda dari schema.prisma saat ini." >&2; exit 1; }
+echo "Baseline preview identik dengan baseline committed: $committed"
