@@ -1,4 +1,5 @@
 const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const refreshAttemptKey = "vitacare-refresh-attempt";
 
 export type ApiOptions = {
   token?: string;
@@ -9,6 +10,7 @@ export type ApiOptions = {
 };
 
 let refreshPromise: Promise<boolean> | null = null;
+const refreshCompletionKey = "vitacare-refresh-complete";
 
 function friendly(status: number, payload: any) {
   const message = Array.isArray(payload?.message) ? payload.message.join(" ") : payload?.message;
@@ -33,6 +35,20 @@ async function performRefresh(): Promise<boolean> {
 }
 
 type RefreshLock = { id: "refresh"; owner: string; until: number };
+
+function refreshAttemptId(): string {
+  const now = Date.now();
+  try {
+    const current = JSON.parse(localStorage.getItem(refreshAttemptKey) ?? "null") as { id?: string; until?: number } | null;
+    if (current?.id && current.until && current.until > now) return current.id;
+    const candidate = { id: crypto.randomUUID(), until: now + 2_000 };
+    localStorage.setItem(refreshAttemptKey, JSON.stringify(candidate));
+    const confirmed = JSON.parse(localStorage.getItem(refreshAttemptKey) ?? "null") as { id?: string } | null;
+    return confirmed?.id ?? candidate.id;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
 
 function openRefreshLockDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -120,12 +136,35 @@ async function refreshWithFallback(): Promise<boolean> {
   }
 }
 
-async function refreshOnce(): Promise<boolean> {
+async function refreshOnce(attemptId: string): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
+  const completed = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(refreshCompletionKey) ?? "null") as { id?: string; ok?: boolean } | null;
+    } catch {
+      return null;
+    }
+  })();
+  if (completed?.id === attemptId) return completed.ok === true;
   const locks = (navigator as unknown as {
     locks?: { request: <T>(name: string, callback: () => Promise<T>) => Promise<T> };
   }).locks;
-  refreshPromise = locks ? locks.request("vitacare-refresh", performRefresh) : refreshWithFallback();
+  if (locks) {
+    refreshPromise = locks.request("vitacare-refresh", async () => {
+      let previous: { id?: string; ok?: boolean } | null = null;
+      try {
+        previous = JSON.parse(localStorage.getItem(refreshCompletionKey) ?? "null") as { id?: string; ok?: boolean } | null;
+      } catch {
+        previous = null;
+      }
+      if (previous?.id === attemptId) return previous.ok === true;
+      const ok = await performRefresh();
+      localStorage.setItem(refreshCompletionKey, JSON.stringify({ id: attemptId, ok }));
+      return ok;
+    });
+  } else {
+    refreshPromise = refreshWithFallback();
+  }
   try {
     return await refreshPromise;
   } finally {
@@ -146,7 +185,7 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
   });
 
   if (response.status === 401 && !options.token && !options._retried && path !== "/auth/refresh") {
-    if (await refreshOnce()) return api<T>(path, { ...options, _retried: true });
+    if (await refreshOnce(refreshAttemptId())) return api<T>(path, { ...options, _retried: true });
   }
   if (!response.ok) throw new Error(friendly(response.status, await response.json().catch(() => null)));
   if (response.status === 204) return undefined as T;

@@ -28,6 +28,7 @@ jobs:
       E2E_ADMIN_PASSWORD: CI-only-password-2026!
       E2E_AUTH_EMAIL: ci-auth-isolated@vitacare.invalid
       E2E_AUTH_PASSWORD: CI-only-password-2026!
+      E2E_2FA_EMAIL: ci-2fa@vitacare.invalid
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
