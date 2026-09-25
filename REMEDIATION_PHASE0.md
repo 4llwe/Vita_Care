@@ -14,6 +14,8 @@
 - New seeded service candidates are inactive until operator approval.
 - Removed unverified numeric claims from the public landing page.
 - Added a migration coverage gate. Production preflight intentionally fails until a reviewed baseline migration exists.
+- Added persistent refresh sessions with opaque HMAC-hashed tokens, transactional rotation, reuse-family revocation, session management, and access-token session validation.
+- Browser refresh coordination uses Web Locks when available and an IndexedDB lease fallback with a 15-second crash-expiry window; refresh retries remain single-use and bounded.
 
 ## Mandatory staging work before deployment
 1. Run `pnpm install --frozen-lockfile` using Node 20 / pnpm 9.
@@ -24,7 +26,6 @@
 6. Configure and approve the first clinical protocol before recording observations.
 
 ## Still pending for Phase 1+
-- Refresh-session persistence, rotation/reuse detection, and device/session management.
 - Multi-role `roles/user_roles` migration and dedicated Doctor, Nurse, Finance roles.
 - Canonical patient/appointment/assignment schema.
 - PostgreSQL RLS and object-level document authorization.

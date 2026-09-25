@@ -1,8 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { loginApi, seedAuth } from "./helpers";
+import { authenticatePage } from "./helpers";
 test("superadmin can open menu CMS", async ({ page, request }) => {
-  const token = await loginApi(request);
-  await seedAuth(page, token);
+  await authenticatePage(page, request);
   await page.goto("/menu-management");
   await expect(
     page.getByRole("heading", { name: /Manajemen Menu Terintegrasi/ }),
