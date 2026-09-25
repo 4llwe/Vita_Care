@@ -19,7 +19,7 @@ cp .env.example .env
 | Variabel | Wajib | Catatan |
 |---|---|---|
 | `DATABASE_URL` | ✅ | `postgresql://user:pass@host:5432/vitacare` |
-| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | ✅ | string acak ≥ 32 char (`openssl rand -hex 32`) |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` / `REFRESH_TOKEN_PEPPER` | ✅ | string acak ≥ 32 char (`openssl rand -hex 32`) |
 | `ENCRYPTION_KEY` | ✅ | kunci enkripsi 2FA/secret |
 | `WEB_ORIGIN` | ✅ | origin frontend, mis. `https://app.vitacarelombok.com` |
 | `API_URL` / `NEXT_PUBLIC_API_URL` | ✅ | URL API yang diakses browser |
@@ -95,6 +95,7 @@ server {
 ## 8. Checklist rilis (centang sebelum go-live)
 
 - [ ] Semua secret default sudah diganti (JWT, ENCRYPTION_KEY, DB, S3, admin).
+- [ ] `REFRESH_TOKEN_PEPPER` sudah disimpan di secret manager dan tidak pernah diganti tanpa rencana invalidasi sesi.
 - [ ] `WEB_ORIGIN` & `NEXT_PUBLIC_API_URL` menunjuk domain produksi (bukan localhost).
 - [ ] `prisma migrate deploy` sukses; backup DB terjadwal.
 - [ ] CORS bucket S3 diterapkan & unggah berkas teruji dari browser.

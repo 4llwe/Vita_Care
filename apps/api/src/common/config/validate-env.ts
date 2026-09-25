@@ -14,6 +14,7 @@ export function validateEnvironment() {
   required("DATABASE_URL");
   strongSecret("JWT_ACCESS_SECRET");
   strongSecret("JWT_REFRESH_SECRET");
+  strongSecret("REFRESH_TOKEN_PEPPER");
   strongSecret("ENCRYPTION_KEY");
   const port = Number(process.env.PORT?.trim() || process.env.API_PORT?.trim() || "3001");
   if (!Number.isInteger(port) || port < 1 || port > 65535)

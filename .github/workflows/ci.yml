@@ -22,8 +22,9 @@ jobs:
           --health-interval 10s --health-timeout 5s --health-retries 5
     env:
       DATABASE_URL: postgresql://vitacare:secret@localhost:5432/vitacare_test
-      JWT_ACCESS_SECRET: ci_access
-      JWT_REFRESH_SECRET: ci_refresh
+      JWT_ACCESS_SECRET: ci-access-secret-0123456789abcdef0123456789abcdef
+      JWT_REFRESH_SECRET: ci-refresh-secret-0123456789abcdef0123456789abcdef
+      REFRESH_TOKEN_PEPPER: ci_refresh_token_pepper_012345678901234567890123
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -58,8 +59,9 @@ jobs:
           --health-interval 10s --health-timeout 5s --health-retries 5
     env:
       DATABASE_URL: postgresql://vitacare:secret@localhost:5432/vitacare
-      JWT_ACCESS_SECRET: ci_access
-      JWT_REFRESH_SECRET: ci_refresh
+      JWT_ACCESS_SECRET: ci-access-secret-0123456789abcdef0123456789abcdef
+      JWT_REFRESH_SECRET: ci-refresh-secret-0123456789abcdef0123456789abcdef
+      REFRESH_TOKEN_PEPPER: ci_refresh_token_pepper_012345678901234567890123
       ENCRYPTION_KEY: ci_encryption_key_please_change_32x
       WEB_ORIGIN: http://localhost:3000
       API_URL: http://localhost:3001

@@ -37,6 +37,7 @@ jobs:
       DATABASE_URL: postgresql://vitacare:vitacare_ci_only@localhost:5432/vitacare_ci
       JWT_ACCESS_SECRET: "ci-access-secret-0123456789abcdef"
       JWT_REFRESH_SECRET: "ci-refresh-secret-0123456789abcdef"
+      REFRESH_TOKEN_PEPPER: "ci-refresh-token-pepper-0123456789abcdef"
       ENCRYPTION_KEY: "ci-encryption-key-0123456789abcdef"
       WEB_ORIGIN: http://127.0.0.1:3000
       API_URL: http://127.0.0.1:3001
@@ -62,8 +63,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm prisma:generate
       - run: pnpm exec prisma validate
-      - name: Generate and statically review squashed baseline preview
-        run: sh scripts/create-baseline-migration.sh
+      - name: Check additive migration coverage and hygiene
+        run: sh scripts/check-migrations.sh
       - name: Build isolated database from reviewed migration history
         run: pnpm exec prisma migrate deploy
       - name: Prove migration deployment is idempotent

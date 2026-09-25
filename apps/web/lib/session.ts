@@ -22,6 +22,15 @@ export type Session = {
   healthWorkerProfile?: { id: string; profession: string; name: string } | null;
 };
 
+export type AuthSession = {
+  id: string;
+  deviceName?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+};
+
 export type ClinicalPersona = "admin" | "doctor" | "nurse" | "patient" | "governance";
 
 export function personaFor(session: Session | null): ClinicalPersona {
@@ -62,4 +71,15 @@ export function getRole(): Role | null {
 /** Ambil identitas pengguna terkini dari server (otoritatif). */
 export async function fetchMe(): Promise<Session> {
   return api<Session>("/auth/me", { token: getToken() });
+}
+
+export function fetchSessions(): Promise<AuthSession[]> {
+  return api<AuthSession[]>("/auth/sessions", { token: getToken() });
+}
+
+export function revokeSession(id: string): Promise<void> {
+  return api<void>(`/auth/sessions/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    token: getToken(),
+  });
 }
