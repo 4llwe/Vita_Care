@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "../../lib/api";
 
@@ -13,12 +13,20 @@ type LoginResp = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const [nextPath, setNextPath] = useState("/dashboard");
   const [email, setEmail] = useState("admin@vitacare.id");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [tempToken, setTempToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("next");
+    if (requested?.startsWith("/") && !requested.startsWith("//")) {
+      setNextPath(requested);
+    }
+  }, []);
 
   const input =
     "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-vita-green focus:outline-none focus:ring-1 focus:ring-vita-green";
@@ -35,7 +43,7 @@ export default function LoginPage() {
       if (r.require2fa && r.tmpToken) {
         setTempToken(r.tmpToken);
       } else if (r.authenticated || r.accessToken) {
-        router.push("/dashboard");
+        router.push(nextPath);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -54,7 +62,7 @@ export default function LoginPage() {
         body: { tmpToken: tempToken, otp },
       });
       if (r.authenticated || r.accessToken) {
-        router.push("/dashboard");
+        router.push(nextPath);
       }
     } catch (e) {
       setError((e as Error).message);

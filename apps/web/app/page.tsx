@@ -20,7 +20,7 @@ export default function HomePage() {
     <>
       <PublicHeader />
       <main className="bg-white">
-        <section className="relative overflow-hidden border-b bg-slate-950">
+        <section id="mulai-layanan" className="relative scroll-mt-24 overflow-hidden border-b bg-slate-950">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,rgba(13,148,136,.34),transparent_35%)]" />
           <div className="relative mx-auto grid max-w-7xl gap-12 px-5 py-20 lg:grid-cols-[1.2fr_.8fr] lg:px-8 lg:py-28">
             <div>
@@ -50,7 +50,7 @@ export default function HomePage() {
                 </Link>
               </div>
             </div>
-            <div className="self-end rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <div id="alur-pelayanan" className="scroll-mt-28 self-end rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
               <p className="text-sm font-bold text-teal-300">
                 Alur keselamatan klinis
               </p>
@@ -72,7 +72,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-        <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+        <section id="ringkasan-hah" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-16 lg:px-8">
           <div className="max-w-3xl">
             <p className="eyebrow">Ringkasan Hospital at Home</p>
             <h2 className="section-title">
@@ -101,7 +101,7 @@ export default function HomePage() {
             ))}
           </div>
         </section>
-        <section className="bg-slate-50">
+        <section id="keunggulan-layanan" className="scroll-mt-24 bg-slate-50">
           <div className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
             <p className="eyebrow">Keunggulan layanan</p>
             <div className="mt-7 grid gap-5 lg:grid-cols-3">
@@ -127,7 +127,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-        <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+        <section id="layanan-unggulan" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-16 lg:px-8">
           <p className="eyebrow">Layanan unggulan</p>
           <div className="mt-7 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {featuredServices.map(([title, href, copy]) => (
@@ -139,7 +139,7 @@ export default function HomePage() {
             ))}
           </div>
         </section>
-        <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+        <section id="statistik-layanan" className="mx-auto max-w-7xl scroll-mt-24 px-5 py-16 lg:px-8">
           <div className="grid gap-10 lg:grid-cols-2">
             <div>
               <p className="eyebrow">Statistik & mutu layanan</p>
@@ -170,7 +170,7 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-        <section className="bg-teal-700">
+        <section id="testimoni" className="scroll-mt-24 bg-teal-700">
           <div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-14 text-white lg:flex-row lg:items-center lg:justify-between lg:px-8">
             <div>
               <p className="text-sm font-bold uppercase tracking-[.2em] text-teal-100">

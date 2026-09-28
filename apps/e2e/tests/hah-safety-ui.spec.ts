@@ -18,6 +18,17 @@ test("mobile header keeps login action visible", async ({ page }) => {
   await expect(page.getByRole("link", { name: /masuk atau login/i })).toBeVisible();
 });
 
+test("mobile menu exposes nested public pages", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByText("Menu", { exact: true }).click();
+  const mobile = page.getByRole("navigation", { name: "Navigasi publik mobile" });
+  await mobile.getByText("Layanan", { exact: true }).click();
+  await expect(
+    mobile.getByRole("link", { name: "Kunjungan Dokter", exact: true }),
+  ).toBeVisible();
+});
+
 test("desktop mega menu exposes every main navigation group", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
@@ -26,4 +37,7 @@ test("desktop mega menu exposes every main navigation group", async ({ page }) =
   await expect(megaMenu.getByRole("link", { name: /Keluarga & Caregiver/i })).toBeVisible();
   await expect(megaMenu.getByRole("link", { name: /^Pembayaran/i })).toBeVisible();
   await expect(megaMenu.getByRole("link", { name: /^Kontak/i })).toBeVisible();
+  await expect(
+    megaMenu.getByRole("link", { name: "Pemeriksaan Laboratorium di Rumah" }),
+  ).toBeVisible();
 });

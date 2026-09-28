@@ -1,5 +1,5 @@
 import { api } from "./api";
-import { PUBLIC_MENU, type PublicMenuGroup } from "./public-menu";
+import { PUBLIC_MENU, slugify, type PublicMenuGroup } from "./public-menu";
 export type DynamicMenuItem = {
   id: string;
   label: string;
@@ -21,25 +21,27 @@ export type DynamicMenuGroup = {
   description?: string;
   items: DynamicMenuItem[];
 };
+
+export function fallbackDynamicMenu(): DynamicMenuGroup[] {
+  return PUBLIC_MENU.map((g, gi) => ({
+    id: `fallback-${g.key}`,
+    key: g.key,
+    label: g.label,
+    items: g.items.map((label, i) => ({
+      id: `fallback-${gi}-${i}`,
+      label,
+      slug: slugify(label),
+      isActive: true,
+      sortOrder: i,
+    })),
+  }));
+}
+
 export async function loadDynamicMenu(): Promise<DynamicMenuGroup[]> {
   try {
     return await api<DynamicMenuGroup[]>("/menus", { cache: "no-store" });
   } catch {
-    return PUBLIC_MENU.map((g, gi) => ({
-      id: `fallback-${g.key}`,
-      key: g.key,
-      label: g.label,
-      items: g.items.map((label, i) => ({
-        id: `fallback-${gi}-${i}`,
-        label,
-        slug: label
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, ""),
-        isActive: true,
-        sortOrder: i,
-      })),
-    }));
+    return fallbackDynamicMenu();
   }
 }
 export function asLegacyMenu(rows: DynamicMenuGroup[]): PublicMenuGroup[] {

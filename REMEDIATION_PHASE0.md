@@ -69,5 +69,12 @@
 - Added role-scoped report and system-readiness pages without exposing credentials or infrastructure secrets.
 - Added end-to-end mobile navigation coverage for Doctor, Nurse, Finance, Patient, and Caregiver roles.
 
+## Phase 1.9 — public information architecture
+- Connected all fourteen public navigation groups and their submenu pages to the existing dynamic menu catalogue.
+- Added complete desktop mega-menu and mobile nested navigation while preserving persistent Emergency and Login actions.
+- Home-directory entries now resolve to real, accessible homepage sections instead of duplicate generic pages.
+- Dynamic slugs, CMS descriptions, and approved internal or HTTPS destination overrides are honored by the public directory.
+- Secure patient, caregiver, monitoring, pharmacy, and payment entries preserve their intended destination through login.
+
 ## Still pending for Phase 1+
-- Full public website information architecture and operator-approved service catalogue.
+- Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

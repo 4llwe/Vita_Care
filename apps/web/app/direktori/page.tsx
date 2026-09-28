@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { PublicHeader } from "../../components/public-header";
 import { PublicFooter } from "../../components/public-footer";
-import { publicHref } from "../../lib/public-menu";
-import { asLegacyMenu, loadDynamicMenu } from "../../lib/dynamic-menu";
+import { publicItemHref } from "../../lib/public-menu";
+import { loadDynamicMenu } from "../../lib/dynamic-menu";
 export default async function Directory() {
-  const menu = asLegacyMenu(await loadDynamicMenu());
+  const menu = await loadDynamicMenu();
   return (
     <>
       <PublicHeader />
@@ -23,12 +23,12 @@ export default async function Directory() {
               <h2 className="text-xl font-black text-slate-950">{g.label}</h2>
               <ul className="mt-5 space-y-1">
                 {g.items.map((i) => (
-                  <li key={i}>
+                  <li key={i.id}>
                     <Link
-                      href={publicHref(g.key, i)}
+                      href={publicItemHref(g.key, i)}
                       className="block rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-teal-50 hover:text-teal-800"
                     >
-                      {i}
+                      {i.label}
                     </Link>
                   </li>
                 ))}

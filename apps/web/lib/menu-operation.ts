@@ -1,5 +1,6 @@
 export type MenuOperation = {
   kind: "secure" | "request" | "contact" | "complaint" | "partnership" | "information";
+  secureHref?: string;
   requestType?:
     "SERVICE" | "BOOKING" | "PARTNERSHIP" | "CONTACT" | "COMPLAINT" | "DOWNLOAD_SUPPORT";
   headline: string;
@@ -13,10 +14,27 @@ const secure = new Set([
   "farmasi-obat",
   "pembayaran",
 ]);
+
+function secureDestination(section: string, slug: string) {
+  if (section === "monitoring-pasien") return "/monitoring";
+  if (section === "pembayaran") return "/invoices";
+  if (section === "farmasi-obat") return "/workspace/farmasi-obat";
+  if (section === "keluarga-caregiver") {
+    if (slug.includes("kondisi")) return "/monitoring";
+    if (slug.includes("jadwal")) return "/bookings";
+    return "/dashboard";
+  }
+  if (slug.includes("jadwal")) return "/bookings";
+  if (slug.includes("monitoring") || slug.includes("kondisi")) return "/monitoring";
+  if (slug.includes("tagihan")) return "/invoices";
+  return "/portal";
+}
+
 export function menuOperation(section: string, slug: string): MenuOperation {
   if (secure.has(section))
     return {
       kind: "secure",
+      secureHref: `/login?next=${encodeURIComponent(secureDestination(section, slug))}`,
       headline: "Akses layanan aman",
       steps: [
         "Masuk menggunakan akun terverifikasi",
@@ -125,6 +143,7 @@ export function operationFromItem(
   return {
     kind: item.operationKind as MenuOperation["kind"],
     requestType: item.requestType as MenuOperation["requestType"],
+    secureHref: fallback.secureHref,
     headline: item.headline ?? fallback.headline,
     steps: Array.isArray(item.steps) && item.steps.length ? item.steps : fallback.steps,
     sla: item.sla ?? fallback.sla,

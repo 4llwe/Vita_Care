@@ -33,6 +33,10 @@ export default async function InfoPage({
   const itemRecord = remote?.item ?? { label: fallback!.item };
   const item = itemRecord.label;
   const content = publicPageContent(group.key, slug, item);
+  const summary =
+    typeof itemRecord.description === "string" && itemRecord.description.trim()
+      ? itemRecord.description
+      : content.summary;
   const operation = operationFromItem(itemRecord, group.key, slug);
   return (
     <>
@@ -49,7 +53,7 @@ export default async function InfoPage({
             <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
               {item}
             </h1>
-            <p className="mt-5 text-lg leading-8 text-slate-600">{content.summary}</p>
+            <p className="mt-5 text-lg leading-8 text-slate-600">{summary}</p>
             {content.audience ? <p className="mt-3 text-sm font-semibold text-teal-800">Untuk: {content.audience}</p> : null}
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
               {content.highlights.map((highlight, index) => (
