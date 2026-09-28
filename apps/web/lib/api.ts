@@ -1,4 +1,5 @@
 const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const REFRESH_GENERATION_KEY = "vitacare-refresh-generation";
 
 export type ApiOptions = {
   token?: string;
@@ -22,6 +23,25 @@ function friendly(status: number, payload: any) {
 
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function refreshGeneration(): number {
+  try {
+    return Number(window.localStorage.getItem(REFRESH_GENERATION_KEY) ?? "0") || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function markRefreshComplete(): void {
+  try {
+    window.localStorage.setItem(
+      REFRESH_GENERATION_KEY,
+      String(refreshGeneration() + 1),
+    );
+  } catch {
+    // Web Locks/session validation remain the fallback.
+  }
 }
 
 async function performRefresh(): Promise<boolean> {
@@ -102,7 +122,7 @@ function waitForRefreshNotice(channel: BroadcastChannel | null, timeoutMs: numbe
   });
 }
 
-async function refreshWithFallback(): Promise<boolean> {
+async function refreshWithFallback(observedGeneration: number): Promise<boolean> {
   const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("vitacare-auth");
   const owner = crypto.randomUUID();
   const lockUntil = Date.now() + 15_000;
@@ -112,7 +132,10 @@ async function refreshWithFallback(): Promise<boolean> {
     db = await openRefreshLockDb();
     for (let attempt = 0; attempt < 80; attempt += 1) {
       if (await acquireRefreshLock(db, owner, lockUntil)) {
-        const ok = (await sessionIsActive()) || (await performRefresh());
+        if (refreshGeneration() > observedGeneration) return true;
+        if (await sessionIsActive()) return true;
+        const ok = await performRefresh();
+        if (ok) markRefreshComplete();
         channel?.postMessage({ type: "refresh-complete", ok });
         return ok;
       }
@@ -128,7 +151,7 @@ async function refreshWithFallback(): Promise<boolean> {
   }
 }
 
-async function refreshOnce(): Promise<boolean> {
+async function refreshOnce(observedGeneration: number): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
 
   const locks = (navigator as unknown as {
@@ -136,10 +159,14 @@ async function refreshOnce(): Promise<boolean> {
   }).locks;
 
   refreshPromise = locks
-    ? locks.request("vitacare-refresh", async () =>
-        (await sessionIsActive()) || (await performRefresh()),
-      )
-    : refreshWithFallback();
+    ? locks.request("vitacare-refresh", async () => {
+        if (refreshGeneration() > observedGeneration) return true;
+        if (await sessionIsActive()) return true;
+        const ok = await performRefresh();
+        if (ok) markRefreshComplete();
+        return ok;
+      })
+    : refreshWithFallback(observedGeneration);
 
   try {
     return await refreshPromise;
@@ -149,6 +176,7 @@ async function refreshOnce(): Promise<boolean> {
 }
 
 export async function api<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+  const observedRefreshGeneration = refreshGeneration();
   const response = await fetch(`${API_URL}/api${path}`, {
     method: options.method ?? "GET",
     credentials: "include",
@@ -161,7 +189,7 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
   });
 
   if (response.status === 401 && !options.token && !options._retried && path !== "/auth/refresh") {
-    if (await refreshOnce()) return api<T>(path, { ...options, _retried: true });
+    if (await refreshOnce(observedRefreshGeneration)) return api<T>(path, { ...options, _retried: true });
   }
   if (!response.ok) throw new Error(friendly(response.status, await response.json().catch(() => null)));
   if (response.status === 204) return undefined as T;
