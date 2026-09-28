@@ -871,19 +871,52 @@ export class HaHService {
     });
     if (duplicate)
       throw new BadRequestException("Medication order aktif yang sama sudah ada");
-    return this.prisma.medicationOrder.create({
-      data: {
-        episodeId: id,
-        medicationName: dto.medicationName,
-        dose: dto.dose,
-        route: dto.route,
-        frequency: dto.frequency,
-        indication: dto.indication,
-        startAt: new Date(dto.startAt),
-        endAt: dto.endAt ? new Date(dto.endAt) : undefined,
-        prescribedById: actorId,
-      },
+    const startAt = new Date(dto.startAt);
+    const endAt = dto.endAt ? new Date(dto.endAt) : undefined;
+    const scheduleAt = [
+      ...new Set((dto.scheduleAt ?? []).map((value) => new Date(value).toISOString())),
+    ].map((value) => new Date(value));
+    if (
+      scheduleAt.some(
+        (value) => value < startAt || (endAt ? value > endAt : false),
+      )
+    )
+      throw new BadRequestException(
+        "Jadwal pemberian harus berada dalam periode medication order",
+      );
+    const order = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.medicationOrder.create({
+        data: {
+          episodeId: id,
+          medicationName: dto.medicationName,
+          dose: dto.dose,
+          route: dto.route,
+          frequency: dto.frequency,
+          indication: dto.indication,
+          startAt,
+          endAt,
+          prescribedById: actorId,
+        },
+      });
+      if (scheduleAt.length)
+        await tx.medicationAdministration.createMany({
+          data: scheduleAt.map((scheduledAt) => ({
+            medicationOrderId: created.id,
+            scheduledById: actorId,
+            scheduledAt,
+            status: "PLANNED",
+          })),
+        });
+      return tx.medicationOrder.findUniqueOrThrow({
+        where: { id: created.id },
+        include: { administrations: { orderBy: { scheduledAt: "asc" } } },
+      });
     });
+    await this.auditEpisodeEvent(actorId, "MEDICATION_ORDER_CREATED", id, {
+      medicationOrderId: order.id,
+      scheduledDoses: scheduleAt.length,
+    });
+    return order;
   }
 
   async updateMedicationStatus(id: string, dto: UpdateMedicationStatusDto) {
@@ -906,17 +939,165 @@ export class HaHService {
       throw new BadRequestException("Medication order tidak aktif");
     if (dto.status !== "GIVEN" && !dto.note)
       throw new BadRequestException("Alasan wajib untuk obat yang tidak diberikan");
-    return this.prisma.medicationAdministration.create({
-      data: {
+    const scheduledAt = new Date(dto.scheduledAt);
+    const planned = await this.prisma.medicationAdministration.findFirst({
+      where: { medicationOrderId: id, scheduledAt },
+    });
+    if (planned && !["PLANNED", "DELAYED"].includes(planned.status))
+      throw new BadRequestException("Dosis terjadwal ini sudah dicatat");
+    const administration = planned
+      ? await this.prisma.medicationAdministration.update({
+          where: { id: planned.id },
+          data: {
+            administeredById: actorId,
+            administeredAt:
+              dto.status === "GIVEN"
+                ? new Date(dto.administeredAt ?? new Date())
+                : undefined,
+            status: dto.status,
+            note: dto.note,
+          },
+        })
+      : await this.prisma.medicationAdministration.create({
+          data: {
+            medicationOrderId: id,
+            scheduledById: actorId,
+            administeredById: actorId,
+            scheduledAt,
+            administeredAt:
+              dto.status === "GIVEN"
+                ? new Date(dto.administeredAt ?? new Date())
+                : undefined,
+            status: dto.status,
+            note: dto.note,
+          },
+        });
+    await this.auditEpisodeEvent(
+      actorId,
+      "MEDICATION_ADMINISTRATION_RECORDED",
+      order.episodeId,
+      {
         medicationOrderId: id,
-        administeredById: actorId,
-        scheduledAt: new Date(dto.scheduledAt),
-        administeredAt:
-          dto.status === "GIVEN" ? new Date(dto.administeredAt ?? new Date()) : undefined,
-        status: dto.status,
-        note: dto.note,
+        administrationId: administration.id,
+        status: administration.status,
+      },
+    );
+    return administration;
+  }
+
+  async medicationAdherence(id: string) {
+    await this.requireEpisode(id);
+    const administrations = await this.prisma.medicationAdministration.findMany({
+      where: {
+        medicationOrder: { episodeId: id },
+        scheduledAt: { lte: new Date() },
+      },
+      orderBy: { scheduledAt: "desc" },
+      take: 500,
+      include: {
+        medicationOrder: {
+          select: { medicationName: true, dose: true, route: true },
+        },
       },
     });
+    const due = administrations.length;
+    const given = administrations.filter((x) => x.status === "GIVEN").length;
+    const missed = administrations.filter((x) =>
+      ["MISSED", "OMITTED", "REFUSED"].includes(x.status),
+    ).length;
+    return {
+      due,
+      given,
+      missed,
+      pending: administrations.filter((x) =>
+        ["PLANNED", "DELAYED"].includes(x.status),
+      ).length,
+      adherencePercent: due ? Math.round((given / due) * 100) : null,
+      administrations,
+    };
+  }
+
+  async processMedicationSchedules(now = new Date()) {
+    const reminderWindow = new Date(now.getTime() + 30 * 60_000);
+    const missedBefore = new Date(now.getTime() - 60 * 60_000);
+    const [reminders, overdue] = await Promise.all([
+      this.prisma.medicationAdministration.findMany({
+        where: {
+          status: "PLANNED",
+          reminderSentAt: null,
+          scheduledAt: { gte: now, lte: reminderWindow },
+          medicationOrder: {
+            status: MedicationOrderStatus.ACTIVE,
+            episode: {
+              status: { in: [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] },
+            },
+          },
+        },
+        include: {
+          medicationOrder: {
+            include: { episode: { include: { patient: true } } },
+          },
+        },
+        take: 100,
+      }),
+      this.prisma.medicationAdministration.findMany({
+        where: {
+          status: "PLANNED",
+          scheduledAt: { lt: missedBefore },
+          medicationOrder: {
+            status: MedicationOrderStatus.ACTIVE,
+            episode: {
+              status: { in: [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] },
+            },
+          },
+        },
+        include: {
+          medicationOrder: {
+            include: { episode: { include: { patient: true } } },
+          },
+        },
+        take: 100,
+      }),
+    ]);
+    let reminded = 0;
+    for (const dose of reminders) {
+      const claimed = await this.prisma.medicationAdministration.updateMany({
+        where: { id: dose.id, status: "PLANNED", reminderSentAt: null },
+        data: { reminderSentAt: now },
+      });
+      if (!claimed.count) continue;
+      await this.notify.enqueue({
+        channel: "in-app",
+        to: dose.medicationOrder.episode.patient.portalUserId ?? undefined,
+        title: "Pengingat obat",
+        body: `${dose.medicationOrder.medicationName} ${dose.medicationOrder.dose} dijadwalkan ${dose.scheduledAt.toLocaleString("id-ID")}. Ikuti instruksi tenaga kesehatan.`,
+      });
+      reminded += 1;
+    }
+    let missed = 0;
+    for (const dose of overdue) {
+      const claimed = await this.prisma.medicationAdministration.updateMany({
+        where: { id: dose.id, status: "PLANNED" },
+        data: { status: "MISSED" },
+      });
+      if (!claimed.count) continue;
+      await this.auditEpisodeEvent(
+        "system",
+        "MEDICATION_DOSE_MISSED",
+        dose.medicationOrder.episodeId,
+        {
+          administrationId: dose.id,
+          medicationOrderId: dose.medicationOrderId,
+          scheduledAt: dose.scheduledAt.toISOString(),
+        },
+      );
+      await this.notify.enqueueClinical(
+        "Dosis obat belum tercatat",
+        `${dose.medicationOrder.episode.code} · ${dose.medicationOrder.episode.patient.fullName}: ${dose.medicationOrder.medicationName} terjadwal ${dose.scheduledAt.toLocaleString("id-ID")}.`,
+      );
+      missed += 1;
+    }
+    return { reminded, missed };
   }
 
   async createVisit(id: string, dto: CreateVisitDto) {

@@ -223,6 +223,20 @@ export class HaHController {
     return this.hah.administerMedication(id, dto, u.id);
   }
 
+  @Get("episodes/:id/medication-adherence")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  medicationAdherence(@Param("id") id: string) {
+    return this.hah.medicationAdherence(id);
+  }
+
   @Post("episodes/:id/visits")
   @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
   visit(@Param("id") id: string, @Body() dto: CreateVisitDto) {

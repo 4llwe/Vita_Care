@@ -429,6 +429,14 @@ export default function EpisodePage() {
                     frequency: f.get("frequency"),
                     indication: f.get("indication"),
                     startAt: new Date(String(f.get("startAt"))).toISOString(),
+                    endAt: f.get("endAt")
+                      ? new Date(String(f.get("endAt"))).toISOString()
+                      : undefined,
+                    scheduleAt: String(f.get("scheduleAt") || "")
+                      .split("\n")
+                      .map((value) => value.trim())
+                      .filter(Boolean)
+                      .map((value) => new Date(value).toISOString()),
                   });
                 }}
               >
@@ -457,6 +465,16 @@ export default function EpisodePage() {
                     className={input}
                   />
                 </Field>
+                <Field label="Selesai (opsional)">
+                  <input name="endAt" type="datetime-local" className={input} />
+                </Field>
+                <Field label="Jadwal dosis (satu tanggal dan waktu per baris)">
+                  <textarea
+                    name="scheduleAt"
+                    className={input}
+                    placeholder={"2026-09-29T08:00\n2026-09-29T20:00"}
+                  />
+                </Field>
                 <button className={btn} disabled={busy}>
                   Buat order
                 </button>
@@ -465,6 +483,49 @@ export default function EpisodePage() {
                 <div key={m.id} className="rounded-lg bg-slate-50 p-3 text-sm">
                   <strong>{m.medicationName}</strong> {m.dose} {m.route} ·{" "}
                   {m.frequency} · {m.status}
+                  {m.administrations?.length ? (
+                    <div className="mt-3 space-y-2">
+                      {m.administrations
+                        .slice()
+                        .sort(
+                          (a: any, b: any) =>
+                            new Date(a.scheduledAt).getTime() -
+                            new Date(b.scheduledAt).getTime(),
+                        )
+                        .map((administration: any) => (
+                          <div
+                            key={administration.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white p-2"
+                          >
+                            <span>
+                              {new Date(administration.scheduledAt).toLocaleString(
+                                "id-ID",
+                              )}{" "}
+                              · <b>{administration.status}</b>
+                            </span>
+                            {["PLANNED", "DELAYED"].includes(
+                              administration.status,
+                            ) && (
+                              <button
+                                onClick={() =>
+                                  submit(
+                                    `/hah/medications/${m.id}/administrations`,
+                                    {
+                                      scheduledAt: administration.scheduledAt,
+                                      status: "GIVEN",
+                                      administeredAt: new Date().toISOString(),
+                                    },
+                                  )
+                                }
+                                className="rounded bg-emerald-600 px-3 py-2 text-white"
+                              >
+                                Catat diberikan
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  ) : null}
                   <div className="mt-2 flex gap-2">
                     <button
                       onClick={() =>
@@ -476,7 +537,7 @@ export default function EpisodePage() {
                       }
                       className="rounded bg-emerald-600 px-3 py-2 text-white"
                     >
-                      Catat diberikan
+                      Catat dosis sekarang
                     </button>
                     <button
                       onClick={() =>
