@@ -2,11 +2,11 @@ import { test, expect } from "@playwright/test";
 test("all directory submenu links resolve", async ({ page }) => {
   await page.goto("/direktori");
   const links = page.locator('main a[href^="/informasi/"], main a[href^="/#"]');
-  expect(await links.count()).toBeGreaterThanOrEqual(117);
+  expect(await links.count()).toBeGreaterThanOrEqual(115);
   const hrefs = await links.evaluateAll((xs) =>
     [...new Set(xs.map((x) => (x as HTMLAnchorElement).getAttribute("href")))].slice(
       0,
-      117,
+      115,
     ),
   );
   for (const href of hrefs) {

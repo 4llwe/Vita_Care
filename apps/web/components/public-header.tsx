@@ -73,7 +73,10 @@ export function PublicHeader() {
               <Link className="rounded-lg p-3 hover:bg-teal-50" href="/">Beranda</Link>
               {navigationMenu.map((group) => (
                 <details key={group.key} className="rounded-xl border border-slate-100">
-                  <summary className="cursor-pointer list-none rounded-xl p-3 hover:bg-teal-50">
+                  <summary
+                    aria-label={`Buka menu ${group.label}`}
+                    className="cursor-pointer list-none rounded-xl p-3 hover:bg-teal-50"
+                  >
                     <span className="flex items-center justify-between gap-3">
                       {group.label}
                       <span aria-hidden="true" className="text-teal-700">+</span>
