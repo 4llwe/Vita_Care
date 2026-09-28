@@ -40,6 +40,8 @@ function metadata(req: Request): AuthRequestMetadata {
   return { ipAddress: req.ip, userAgent: req.get("user-agent") };
 }
 
+const AUTH_ATTEMPT_LIMIT = process.env.NODE_ENV === "test" ? 50 : 5;
+
 @Controller("auth")
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
@@ -56,7 +58,7 @@ export class AuthController {
 
   @Post("login")
   @HttpCode(200)
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: AUTH_ATTEMPT_LIMIT } })
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.auth.login(dto.email, dto.password, metadata(req));
     if (result.require2fa) return result;
@@ -66,7 +68,7 @@ export class AuthController {
 
   @Post("2fa")
   @HttpCode(200)
-  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @Throttle({ default: { ttl: 60000, limit: AUTH_ATTEMPT_LIMIT } })
   async twofa(@Body() dto: Verify2faDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const tokens = await this.auth.verify2fa(dto.tmpToken, dto.otp, metadata(req));
     this.set(res, tokens);

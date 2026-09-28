@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import { raceAuthStatePath } from "../global-setup";
 import { readFileSync } from "node:fs";
 
+const apiUrl = process.env.E2E_API_URL ?? "http://localhost:3001";
+
 test("two tabs share one refresh rotation and both recover", async ({ browser }) => {
   const state = JSON.parse(readFileSync(raceAuthStatePath, "utf8")) as {
     cookies: Array<Record<string, unknown> & { name: string; value: string }>;
@@ -31,20 +33,22 @@ test("two tabs share one refresh rotation and both recover", async ({ browser })
   await expect.poll(async () => {
     return Promise.all(
       [first, second].map((page) =>
-        page.evaluate(async () => {
-          const response = await fetch("http://127.0.0.1:3001/api/auth/me", {
+        page.evaluate(async (baseUrl) => {
+          const response = await fetch(`${baseUrl}/api/auth/me`, {
             credentials: "include",
           });
           return response.status;
-        }),
+        }, apiUrl),
       ),
     );
   }, { timeout: 10_000 }).toEqual([200, 200]);
   await expect.poll(async () =>
-    first.evaluate(async () => {
-      const response = await fetch("http://127.0.0.1:3001/api/auth/sessions", { credentials: "include" });
+    first.evaluate(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/auth/sessions`, {
+        credentials: "include",
+      });
       return response.status;
-    }),
+    }, apiUrl),
   ).toBe(200);
 
   await context.close();
