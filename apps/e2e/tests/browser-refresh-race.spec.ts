@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { authStatePath } from "../global-setup";
+import { raceAuthStatePath } from "../global-setup";
 import { readFileSync } from "node:fs";
 
 test("two tabs share one refresh rotation and both recover", async ({ browser }) => {
-  const state = JSON.parse(readFileSync(authStatePath, "utf8")) as {
+  const state = JSON.parse(readFileSync(raceAuthStatePath, "utf8")) as {
     cookies: Array<Record<string, unknown> & { name: string; value: string }>;
     origins: unknown[];
   };
