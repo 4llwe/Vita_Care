@@ -27,7 +27,7 @@ export class BookingController {
   }
 
   @Get('assigned/me')
-  @Roles('HEALTH_WORKER', 'SUPER_ADMIN')
+  @Roles('HEALTH_WORKER', 'DOCTOR', 'NURSE', 'SUPER_ADMIN')
   assignedToMe(@CurrentUser() user: { id: string }) { return this.booking.assignedToMe(user.id); }
 
   // ----- Portal Pasien -----
@@ -68,14 +68,14 @@ export class BookingController {
   }
 
   @Patch(':id/status/:status')
-  @Roles('COORDINATOR', 'SUPER_ADMIN', 'HEALTH_WORKER')
+  @Roles('COORDINATOR', 'SUPER_ADMIN', 'HEALTH_WORKER', 'DOCTOR', 'NURSE')
   changeStatus(@Param('id') id: string, @Param('status') status: BookingStatus, @CurrentUser() user: { id: string; role: string }) {
     return this.booking.changeStatus(id, status, user);
   }
 
   // Ping lokasi nakes saat "Dalam Perjalanan" (dipanggil berkala dari perangkat nakes).
   @Patch(':id/location')
-  @Roles('HEALTH_WORKER', 'COORDINATOR', 'SUPER_ADMIN')
+  @Roles('HEALTH_WORKER', 'DOCTOR', 'NURSE', 'COORDINATOR', 'SUPER_ADMIN')
   updateLocation(@Param('id') id: string, @Body() dto: UpdateLocationDto, @CurrentUser() user: { id: string; role: string }) {
     return this.booking.updateLocation(id, dto, user);
   }

@@ -18,7 +18,7 @@ export class CapaController {
   }
 
   @Patch(':id/progress')
-  @Roles('UNIT_HEAD', 'HEALTH_WORKER', 'SUPER_ADMIN')
+  @Roles('UNIT_HEAD', 'HEALTH_WORKER', 'DOCTOR', 'NURSE', 'SUPER_ADMIN')
   updateProgress(@Param('id') id: string, @Body() dto: UpdateCapaProgressDto) {
     return this.capa.updateProgress(id, dto);
   }

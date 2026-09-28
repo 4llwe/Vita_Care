@@ -12,14 +12,14 @@ export class BillingController {
 
   @Post('invoices')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('COORDINATOR', 'SUPER_ADMIN', 'DIRECTOR')
+  @Roles('FINANCE', 'COORDINATOR', 'SUPER_ADMIN', 'DIRECTOR')
   create(@Body() dto: CreateInvoiceDto) {
     return this.billing.createInvoice(dto);
   }
 
   @Post('invoices/:id/pay')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('PATIENT', 'COORDINATOR', 'SUPER_ADMIN')
+  @Roles('PATIENT', 'FINANCE', 'COORDINATOR', 'SUPER_ADMIN')
   pay(@Param('id') id: string, @CurrentUser() user: { id: string; role: string }) {
     return this.billing.pay(id, user);
   }
@@ -31,14 +31,14 @@ export class BillingController {
 
   @Get('invoices/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('PATIENT', 'COORDINATOR', 'SUPER_ADMIN', 'DIRECTOR', 'AUDITOR')
+  @Roles('PATIENT', 'FINANCE', 'COORDINATOR', 'SUPER_ADMIN', 'DIRECTOR', 'AUDITOR')
   findOne(@Param('id') id: string, @CurrentUser() user: { id: string; role: string }) {
     return this.billing.findOne(id, user);
   }
 
   @Get('invoices')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('COORDINATOR', 'SUPER_ADMIN', 'DIRECTOR', 'AUDITOR')
+  @Roles('FINANCE', 'COORDINATOR', 'SUPER_ADMIN', 'DIRECTOR', 'AUDITOR')
   findAll() {
     return this.billing.findAll();
   }

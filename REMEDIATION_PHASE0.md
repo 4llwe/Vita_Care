@@ -25,8 +25,14 @@
 5. Perform negative authorization tests for cross-patient and cross-assignment access.
 6. Configure and approve the first clinical protocol before recording observations.
 
+## Phase 1.2 — multi-role foundation
+- Added additive `UserRole` assignments while preserving `User.role` as the primary compatibility role.
+- Backfilled every existing primary role into `UserRole`.
+- Added dedicated `DOCTOR`, `NURSE`, and `FINANCE` roles.
+- JWT validation and role guards resolve effective roles from the database on every authenticated request.
+- Clinical object-level assignment checks continue to apply to Doctor and Nurse access.
+
 ## Still pending for Phase 1+
-- Multi-role `roles/user_roles` migration and dedicated Doctor, Nurse, Finance roles.
 - Canonical patient/appointment/assignment schema.
 - PostgreSQL RLS and object-level document authorization.
 - Redis-backed durable jobs and horizontally safe schedulers.

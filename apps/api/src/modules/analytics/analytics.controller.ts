@@ -77,7 +77,7 @@ export class AnalyticsController {
   }
 
   @Get('reports/referral/:id.pdf')
-  @Roles('HEALTH_WORKER', 'COORDINATOR', 'DIRECTOR', 'SUPER_ADMIN')
+  @Roles('HEALTH_WORKER', 'DOCTOR', 'NURSE', 'COORDINATOR', 'DIRECTOR', 'SUPER_ADMIN')
   async referralPdf(@Param('id') id: string, @Res() res: Response) {
     const { buffer, code } = await this.reporting.referralPdf(id);
     res.set({
