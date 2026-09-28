@@ -5,18 +5,19 @@ import {
   Injectable,
 } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
+import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/actor";
 @Injectable()
 export class HaHAccessGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
   async canActivate(context: ExecutionContext) {
     const req = context.switchToHttp().getRequest<{
-      user?: { id: string; role: string };
+      user?: AuthActor;
       params?: { id?: string };
       route?: { path?: string };
       method: string;
     }>();
     const user = req.user;
-    if (!user || !["PATIENT", "CAREGIVER", "HEALTH_WORKER"].includes(user.role))
+    if (!user || !actorHasAnyRole(user, ["PATIENT", "CAREGIVER", ...CLINICAL_ROLES]))
       return true;
     const path = String(req.route?.path ?? "");
     if (!req.params?.id) return true;
@@ -83,7 +84,7 @@ export class HaHAccessGuard implements CanActivate {
                   },
                 },
               }
-            : {
+            : actorHasAnyRole(user, CLINICAL_ROLES) ? {
                 id: episodeId,
                 OR: [
                   { attendingPhysicianId: user.id },
@@ -98,7 +99,7 @@ export class HaHAccessGuard implements CanActivate {
                     },
                   },
                 ],
-              },
+              } : { id: "__no_episode_access__" },
       select: { id: true },
     });
     if (!episode)
@@ -107,7 +108,7 @@ export class HaHAccessGuard implements CanActivate {
     // UI navigation is not a security boundary. Enforce clinical scope on the
     // server so a non-doctor cannot prescribe, approve, or discharge by calling
     // the API directly. Existing HEALTH_WORKER roles remain supported.
-    if (user.role === "HEALTH_WORKER" && req.method !== "GET") {
+    if (actorHasAnyRole(user, CLINICAL_ROLES) && req.method !== "GET") {
       const profile = await this.prisma.healthWorker.findUnique({
         where: { userId: user.id },
         select: { profession: true, isActive: true, licenseValidUntil: true },
@@ -115,8 +116,8 @@ export class HaHAccessGuard implements CanActivate {
       if (!profile || !profile.isActive || profile.licenseValidUntil <= new Date())
         throw new ForbiddenException("Profil atau izin praktik tidak aktif");
       const profession = profile.profession.toLowerCase();
-      const isDoctor = profession.includes("dokter");
-      const isNurse = profession.includes("perawat") || profession.includes("bidan");
+      const isDoctor = actorHasAnyRole(user, ["DOCTOR"]) || profession.includes("dokter");
+      const isNurse = actorHasAnyRole(user, ["NURSE"]) || profession.includes("perawat") || profession.includes("bidan");
       const doctorOnly = [
         "eligibility",
         "admit",

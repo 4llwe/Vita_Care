@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { BookingStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from '../../common/auth/actor';
 import { GeoService } from './geo.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { SelfBookingDto } from './dto/self-booking.dto';
@@ -168,7 +169,7 @@ export class BookingService {
   }
 
   /** Nakes membagikan posisi terkini saat menuju lokasi pasien (hanya DALAM_PERJALANAN). */
-  async updateLocation(id: string, dto: UpdateLocationDto, actor?: { id: string; role: string }) {
+  async updateLocation(id: string, dto: UpdateLocationDto, actor?: AuthActor) {
     const bk = await this.prisma.booking.findUnique({ where: { id } });
     if (!bk) throw new NotFoundException('Booking tidak ditemukan');
     await this.requireAssignedWorker(bk.healthWorkerId, actor);
@@ -182,8 +183,8 @@ export class BookingService {
     });
   }
   assignedToMe(userId: string) { return this.prisma.booking.findMany({ where: { healthWorker: { userId } }, orderBy: { scheduledAt: "desc" }, include: { service: true, healthWorker: true } }); }
-  private async requireAssignedWorker(healthWorkerId: string | null, actor?: { id: string; role: string }) {
-    if (!actor || actor.role !== "HEALTH_WORKER") return;
+  private async requireAssignedWorker(healthWorkerId: string | null, actor?: AuthActor) {
+    if (!actor || !actorHasAnyRole(actor, CLINICAL_ROLES)) return;
     const assigned = healthWorkerId ? await this.prisma.healthWorker.findFirst({ where: { id: healthWorkerId, userId: actor.id, isActive: true }, select: { id: true } }) : null;
     if (!assigned) throw new BadRequestException("Booking tidak ditugaskan kepada Anda");
   }

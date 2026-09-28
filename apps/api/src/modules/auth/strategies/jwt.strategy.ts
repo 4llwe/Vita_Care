@@ -1,10 +1,14 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
+import type { Role } from "@prisma/client";
 import type { Request } from "express";
 import { PrismaService } from "../../../common/prisma/prisma.service";
 
 const SESSION_IDLE_MS = 24 * 60 * 60 * 1000;
+function effectiveRoles(primaryRole: Role, assignments: Array<{ role: Role }>): Role[] {
+  return [...new Set([primaryRole, ...assignments.map(({ role }) => role)])];
+}
 
 function cookie(req: Request) {
   for (const item of (req?.headers?.cookie ?? "").split(";")) {
@@ -34,6 +38,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       select: {
         id: true,
         role: true,
+        roleAssignments: { select: { role: true } },
         isActive: true,
         authSessions: {
           where: {
@@ -50,6 +55,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user?.isActive || user.authSessions.length !== 1) {
       throw new UnauthorizedException("Sesi tidak aktif");
     }
-    return { id: user.id, role: user.role, sessionId: payload.sid };
+    return {
+      id: user.id, role: user.role,
+      roles: effectiveRoles(user.role, user.roleAssignments),
+      sessionId: payload.sid,
+    };
   }
 }

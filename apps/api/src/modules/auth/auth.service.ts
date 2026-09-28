@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { Prisma } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import * as argon2 from "argon2";
 import * as speakeasy from "speakeasy";
 import { PrismaService } from "../../common/prisma/prisma.service";
@@ -42,6 +42,9 @@ function safeMetadata(metadata: AuthRequestMetadata) {
 function unauthorized(): UnauthorizedException {
   return new UnauthorizedException("Sesi tidak valid");
 }
+function effectiveRoles(primaryRole: Role, assignments: Array<{ role: Role }> = []): Role[] {
+  return [...new Set([primaryRole, ...assignments.map(({ role }) => role)])];
+}
 
 @Injectable()
 export class AuthService {
@@ -51,7 +54,10 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { roleAssignments: { select: { role: true } } },
+    });
     if (!user || !(await argon2.verify(user.passwordHash, password))) {
       throw new UnauthorizedException("Email atau kata sandi salah");
     }
@@ -72,7 +78,10 @@ export class AuthService {
       );
       return { require2fa: true, tmpToken };
     }
-    return { require2fa: false, ...(await this.createSession(user.id, user.role, metadata, "LOGIN_SUCCESS")) };
+    return { require2fa: false, ...(await this.createSession(
+      user.id, user.role, effectiveRoles(user.role, user.roleAssignments),
+      metadata, "LOGIN_SUCCESS",
+    )) };
   }
 
   async verify2fa(
@@ -89,7 +98,10 @@ export class AuthService {
     if (!payload.sub || payload.typ !== "mfa_pending" || !payload.twofa) {
       throw new UnauthorizedException("Sesi 2FA tidak valid");
     }
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: { roleAssignments: { select: { role: true } } },
+    });
     if (!user?.isActive || !user.twoFaSecret) {
       throw new UnauthorizedException("Akun atau 2FA tidak aktif");
     }
@@ -100,7 +112,10 @@ export class AuthService {
       window: 1,
     });
     if (!ok) throw new UnauthorizedException("Kode 2FA tidak valid");
-    return this.createSession(user.id, user.role, metadata, "MFA_SUCCESS");
+    return this.createSession(
+      user.id, user.role, effectiveRoles(user.role, user.roleAssignments),
+      metadata, "MFA_SUCCESS",
+    );
   }
 
   async refresh(token: string, metadata: AuthRequestMetadata = {}): Promise<AuthTokens> {
@@ -113,14 +128,20 @@ export class AuthService {
     const result = await this.prisma.$transaction(async (tx) => {
       let row = await tx.refreshToken.findUnique({
         where: { tokenIdHash },
-        include: { session: { include: { user: { select: { id: true, role: true, isActive: true } } } } },
+        include: { session: { include: { user: { select: {
+          id: true, role: true, isActive: true,
+          roleAssignments: { select: { role: true } },
+        } } } } },
       });
       if (!row) return { kind: "failure" as const };
 
       await tx.$queryRaw(Prisma.sql`SELECT "id" FROM "AuthSession" WHERE "id" = ${row.sessionId} FOR UPDATE`);
       row = await tx.refreshToken.findUnique({
         where: { tokenIdHash },
-        include: { session: { include: { user: { select: { id: true, role: true, isActive: true } } } } },
+        include: { session: { include: { user: { select: {
+          id: true, role: true, isActive: true,
+          roleAssignments: { select: { role: true } },
+        } } } } },
       });
       if (!row) return { kind: "failure" as const };
 
@@ -173,6 +194,7 @@ export class AuthService {
         kind: "success" as const,
         userId: row.session.user.id,
         role: row.session.user.role,
+        roles: effectiveRoles(row.session.user.role, row.session.user.roleAssignments),
         sessionId: row.sessionId,
         refreshToken: next.value,
       };
@@ -180,7 +202,9 @@ export class AuthService {
 
     if (result.kind !== "success") throw unauthorized();
     return {
-      accessToken: await this.issueAccessToken(result.userId, result.role, result.sessionId),
+      accessToken: await this.issueAccessToken(
+        result.userId, result.role, result.roles, result.sessionId,
+      ),
       refreshToken: result.refreshToken,
     };
   }
@@ -248,21 +272,25 @@ export class AuthService {
   }
 
   async me(id: string) {
-    return this.prisma.user.findUniqueOrThrow({
+    const user = await this.prisma.user.findUniqueOrThrow({
       where: { id },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
+        roleAssignments: { select: { role: true } },
         healthWorkerProfile: { select: { id: true, profession: true, name: true } },
       },
     });
+    const { roleAssignments, ...profile } = user;
+    return { ...profile, roles: effectiveRoles(user.role, roleAssignments) };
   }
 
   private async createSession(
     userId: string,
-    role: string,
+    role: Role,
+    roles: Role[],
     metadata: AuthRequestMetadata,
     successEvent: "LOGIN_SUCCESS" | "MFA_SUCCESS",
   ): Promise<AuthTokens> {
@@ -291,14 +319,14 @@ export class AuthService {
       return created;
     });
     return {
-      accessToken: await this.issueAccessToken(userId, role, session.id),
+      accessToken: await this.issueAccessToken(userId, role, roles, session.id),
       refreshToken: material.value,
     };
   }
 
-  private issueAccessToken(sub: string, role: string, sid: string) {
+  private issueAccessToken(sub: string, role: Role, roles: Role[], sid: string) {
     return this.jwt.signAsync(
-      { sub, role, sid, typ: "access" },
+      { sub, role, roles, sid, typ: "access" },
       { expiresIn: process.env.JWT_ACCESS_TTL ?? "15m" },
     );
   }

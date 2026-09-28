@@ -7,6 +7,9 @@ export type Role =
   | "SUPER_ADMIN"
   | "COORDINATOR"
   | "HEALTH_WORKER"
+  | "DOCTOR"
+  | "NURSE"
+  | "FINANCE"
   | "AUDITOR"
   | "UNIT_HEAD"
   | "DIRECTOR"
@@ -19,6 +22,7 @@ export type Session = {
   name: string;
   email: string;
   role: Role;
+  roles?: Role[];
   healthWorkerProfile?: { id: string; profession: string; name: string } | null;
 };
 
@@ -37,6 +41,8 @@ export function personaFor(session: Session | null): ClinicalPersona {
   if (!session) return "patient";
   if (session.role === "SUPER_ADMIN" || session.role === "COORDINATOR") return "admin";
   if (session.role === "PATIENT" || session.role === "CAREGIVER") return "patient";
+  if (session.role === "NURSE") return "nurse";
+  if (session.role === "DOCTOR") return "doctor";
   if (session.role !== "HEALTH_WORKER") return "governance";
   const p = (session.healthWorkerProfile?.profession ?? "").toLowerCase();
   return p.includes("perawat") || p.includes("bidan") ? "nurse" : "doctor";
@@ -46,6 +52,9 @@ export const ROLE_LABEL: Record<string, string> = {
   SUPER_ADMIN: "Super Admin",
   COORDINATOR: "Koordinator",
   HEALTH_WORKER: "Tenaga Kesehatan",
+  DOCTOR: "Dokter",
+  NURSE: "Perawat",
+  FINANCE: "Keuangan",
   AUDITOR: "Auditor",
   UNIT_HEAD: "Kepala Unit",
   DIRECTOR: "Direktur",

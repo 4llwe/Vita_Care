@@ -12,6 +12,7 @@ import {
   MedicationOrderStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
+import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/actor";
 import { NotificationService } from "../notification/notification.service";
 import {
   AdministerMedicationDto,
@@ -161,12 +162,15 @@ export class HaHService {
     await this.requireEpisode(episodeId);
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { healthWorkerProfile: true },
+      include: { healthWorkerProfile: true, roleAssignments: { select: { role: true } } },
     });
+    const clinicalUser = !!user && actorHasAnyRole({
+      role: user.role, roles: user.roleAssignments.map(({ role }) => role),
+    }, CLINICAL_ROLES);
     if (
       !user ||
       !user.isActive ||
-      (user.role === "HEALTH_WORKER" &&
+      (clinicalUser &&
         (!user.healthWorkerProfile ||
           !user.healthWorkerProfile.isActive ||
           user.healthWorkerProfile.licenseValidUntil <= new Date()))
@@ -973,7 +977,7 @@ export class HaHService {
     }
   }
 
-  listEpisodes(status?: HaHEpisodeStatus, actor?: { id: string; role: string }) {
+  listEpisodes(status?: HaHEpisodeStatus, actor?: AuthActor) {
     const access =
       actor?.role === "PATIENT"
         ? { patient: { portalUserId: actor.id } }
@@ -989,7 +993,7 @@ export class HaHService {
                 },
               },
             }
-          : actor?.role === "HEALTH_WORKER"
+          : actor && actorHasAnyRole(actor, CLINICAL_ROLES)
             ? {
                 OR: [
                   { attendingPhysicianId: actor.id },
@@ -1017,7 +1021,7 @@ export class HaHService {
     });
   }
 
-  async getEpisode(id: string, actor?: { id: string; role: string }) {
+  async getEpisode(id: string, actor?: AuthActor) {
     const access =
       actor?.role === "PATIENT"
         ? { patient: { portalUserId: actor.id } }
@@ -1033,7 +1037,7 @@ export class HaHService {
                 },
               },
             }
-          : actor?.role === "HEALTH_WORKER"
+          : actor && actorHasAnyRole(actor, CLINICAL_ROLES)
             ? {
                 OR: [
                   { attendingPhysicianId: actor.id },

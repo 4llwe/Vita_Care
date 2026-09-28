@@ -18,7 +18,7 @@ function makeService() {
       lastSeenAt: new Date(),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       revokedAt: null,
-      user: { id: "user-1", role: "PATIENT", isActive: true },
+      user: { id: "user-1", role: "PATIENT", roleAssignments: [{ role: "PATIENT" }], isActive: true },
     },
   };
   const tx: any = {
@@ -44,7 +44,10 @@ function makeService() {
       return result;
     },
     user: {
-      findUnique: jest.fn(async () => ({ id: "user-1", role: "PATIENT", isActive: true })),
+      findUnique: jest.fn(async () => ({
+        id: "user-1", role: "PATIENT",
+        roleAssignments: [{ role: "PATIENT" }], isActive: true,
+      })),
     },
   };
   const jwt: any = { signAsync: jest.fn(async (payload) => JSON.stringify(payload)) };
@@ -60,7 +63,16 @@ describe("AuthService persistent refresh sessions", () => {
     expect(state.rotatedAt).toBeInstanceOf(Date);
     expect(tx.refreshToken.create).toHaveBeenCalledTimes(1);
     expect(jwt.signAsync).toHaveBeenCalledWith(
-      { sub: "user-1", role: "PATIENT", sid: "session-1", typ: "access" },
+      { sub: "user-1", role: "PATIENT", roles: ["PATIENT"], sid: "session-1", typ: "access" },
+      expect.any(Object),
+    );
+  });
+  it("includes assigned roles in the access token", async () => {
+    const { service, material, state, jwt } = makeService();
+    state.session.user.roleAssignments = [{ role: "PATIENT" }, { role: "FINANCE" }];
+    await service.refresh(material.value);
+    expect(jwt.signAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "PATIENT", roles: ["PATIENT", "FINANCE"] }),
       expect.any(Object),
     );
   });

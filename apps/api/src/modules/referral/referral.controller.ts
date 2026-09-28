@@ -12,19 +12,19 @@ export class ReferralController {
   constructor(private readonly referral: ReferralService) {}
 
   @Post()
-  @Roles('HEALTH_WORKER', 'COORDINATOR', 'SUPER_ADMIN')
+  @Roles('HEALTH_WORKER', 'DOCTOR', 'NURSE', 'COORDINATOR', 'SUPER_ADMIN')
   create(@Body() dto: CreateReferralDto) {
     return this.referral.create(dto);
   }
 
   @Get()
-  @Roles('HEALTH_WORKER', 'COORDINATOR', 'DIRECTOR', 'SUPER_ADMIN')
+  @Roles('HEALTH_WORKER', 'DOCTOR', 'NURSE', 'COORDINATOR', 'DIRECTOR', 'SUPER_ADMIN')
   findAll() {
     return this.referral.findAll();
   }
 
   @Get(':id')
-  @Roles('HEALTH_WORKER', 'COORDINATOR', 'DIRECTOR', 'SUPER_ADMIN')
+  @Roles('HEALTH_WORKER', 'DOCTOR', 'NURSE', 'COORDINATOR', 'DIRECTOR', 'SUPER_ADMIN')
   findOne(@Param('id') id: string) {
     return this.referral.findOne(id);
   }

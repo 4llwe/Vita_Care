@@ -2,12 +2,13 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateRecordDto } from './dto/create-record.dto';
 import { computeEws } from './ews';
+import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from '../../common/auth/actor';
 
 @Injectable()
 export class MedicalRecordService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateRecordDto, actor: { id: string; role: string }) {
+  async create(dto: CreateRecordDto, actor: AuthActor) {
     await this.assertBookingAccess(dto.bookingId, actor);
     const ews = computeEws(dto);
     return this.prisma.medicalRecord.create({
@@ -32,7 +33,7 @@ export class MedicalRecordService {
   }
 
   /** Rekam medis yang sudah dikunci tidak boleh diubah (integritas data). */
-  async update(id: string, dto: Partial<CreateRecordDto>, actor: { id: string; role: string }) {
+  async update(id: string, dto: Partial<CreateRecordDto>, actor: AuthActor) {
     const rec = await this.prisma.medicalRecord.findUnique({ where: { id } });
     if (!rec) throw new NotFoundException('Rekam medis tidak ditemukan');
     await this.assertBookingAccess(rec.bookingId, actor);
@@ -47,7 +48,7 @@ export class MedicalRecordService {
   }
 
   /** Tanda tangan digital + kunci rekam medis (tidak dapat diubah lagi). */
-  async sign(id: string, actor: { id: string; role: string }) {
+  async sign(id: string, actor: AuthActor) {
     const rec = await this.prisma.medicalRecord.findUnique({ where: { id } });
     if (!rec) throw new NotFoundException('Rekam medis tidak ditemukan');
     await this.assertBookingAccess(rec.bookingId, actor);
@@ -58,6 +59,6 @@ export class MedicalRecordService {
     });
   }
 
-  async findOne(id: string, actor: { id: string; role: string }) { const record = await this.prisma.medicalRecord.findUniqueOrThrow({ where: { id }, include: { signedBy: true } }); await this.assertBookingAccess(record.bookingId, actor); return record; }
-  private async assertBookingAccess(bookingId: string, actor: { id: string; role: string }) { if (actor.role !== "HEALTH_WORKER") return; const allowed = await this.prisma.booking.findFirst({ where: { id: bookingId, healthWorker: { userId: actor.id, isActive: true } }, select: { id: true } }); if (!allowed) throw new ForbiddenException("Anda tidak ditugaskan pada kunjungan ini"); }
+  async findOne(id: string, actor: AuthActor) { const record = await this.prisma.medicalRecord.findUniqueOrThrow({ where: { id }, include: { signedBy: true } }); await this.assertBookingAccess(record.bookingId, actor); return record; }
+  private async assertBookingAccess(bookingId: string, actor: AuthActor) { if (!actorHasAnyRole(actor, CLINICAL_ROLES)) return; const allowed = await this.prisma.booking.findFirst({ where: { id: bookingId, healthWorker: { userId: actor.id, isActive: true } }, select: { id: true } }); if (!allowed) throw new ForbiddenException("Anda tidak ditugaskan pada kunjungan ini"); }
 }
