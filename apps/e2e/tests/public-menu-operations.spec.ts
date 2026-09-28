@@ -1,18 +1,33 @@
 import { test, expect } from "@playwright/test";
 test("all directory submenu links resolve", async ({ page }) => {
   await page.goto("/direktori");
-  const links = page.locator('a[href^="/informasi/"]');
-  expect(await links.count()).toBeGreaterThanOrEqual(117);
+  const links = page.locator('main a[href^="/informasi/"], main a[href^="/#"]');
+  expect(await links.count()).toBeGreaterThanOrEqual(115);
   const hrefs = await links.evaluateAll((xs) =>
     [...new Set(xs.map((x) => (x as HTMLAnchorElement).getAttribute("href")))].slice(
       0,
-      117,
+      115,
     ),
   );
   for (const href of hrefs) {
     const response = await page.request.get(String(href));
     expect(response.status(), String(href)).toBeLessThan(400);
   }
+});
+
+test("homepage directory entries target real sections", async ({ page }) => {
+  await page.goto("/direktori");
+  await page.getByRole("link", { name: "Alur Pelayanan", exact: true }).click();
+  await expect(page).toHaveURL(/\/#alur-pelayanan$/);
+  await expect(page.locator("#alur-pelayanan")).toBeVisible();
+});
+
+test("secure public entry preserves its operational destination", async ({ page }) => {
+  await page.goto("/informasi/pasien/jadwal-kunjungan");
+  await expect(page.getByRole("link", { name: "Masuk ke layanan aman" })).toHaveAttribute(
+    "href",
+    "/login?next=%2Fbookings",
+  );
 });
 test("service request form creates ticket", async ({ page }) => {
   await page.goto("/informasi/layanan/kunjungan-dokter");

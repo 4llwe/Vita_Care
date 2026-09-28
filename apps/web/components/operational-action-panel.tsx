@@ -57,7 +57,7 @@ export function OperationalActionPanel({
       <p className="mt-3 text-sm font-semibold text-teal-900">SLA: {operation.sla}</p>
       {operation.kind === "secure" ? (
         <Link
-          href="/login"
+          href={operation.secureHref ?? "/login"}
           className="mt-5 inline-flex rounded-xl bg-teal-700 px-5 py-3 font-black text-white"
         >
           Masuk ke layanan aman

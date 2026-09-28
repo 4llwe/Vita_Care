@@ -210,9 +210,39 @@ export const slugify = (value: string) =>
     .replace(/&/g, " dan ")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+
+const homeAnchors: Record<string, string> = {
+  "ringkasan-hospital-at-home": "ringkasan-hah",
+  "keunggulan-layanan": "keunggulan-layanan",
+  "alur-pelayanan": "alur-pelayanan",
+  "layanan-unggulan": "layanan-unggulan",
+  "statistik-layanan": "statistik-layanan",
+  testimoni: "testimoni",
+  "call-to-action": "mulai-layanan",
+};
+
 export function publicHref(section: string, item: string) {
+  if (section === "beranda") {
+    const anchor = homeAnchors[slugify(item)];
+    if (anchor) return `/#${anchor}`;
+  }
   return `/informasi/${section}/${slugify(item)}`;
 }
+
+export function publicItemHref(
+  section: string,
+  item: { label: string; slug?: string; hrefOverride?: string },
+) {
+  if (
+    item.hrefOverride &&
+    (item.hrefOverride.startsWith("/") || item.hrefOverride.startsWith("https://"))
+  ) {
+    return item.hrefOverride;
+  }
+  if (section === "beranda") return publicHref(section, item.label);
+  return `/informasi/${section}/${item.slug || slugify(item.label)}`;
+}
+
 export function findPublicItem(section: string, slug: string) {
   const group = PUBLIC_MENU.find((x) => x.key === section);
   const item = group?.items.find((x) => slugify(x) === slug);
