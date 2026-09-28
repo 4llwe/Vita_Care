@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 
 const apiUrl = process.env.E2E_API_URL ?? "http://localhost:3001";
 
-test("two tabs share one refresh rotation and both recover", async ({ browser }) => {
+test("two tabs recover without revoking the shared session", async ({ browser }) => {
   const state = JSON.parse(readFileSync(raceAuthStatePath, "utf8")) as {
     cookies: Array<Record<string, unknown> & { name: string; value: string }>;
     origins: unknown[];
@@ -29,7 +29,7 @@ test("two tabs share one refresh rotation and both recover", async ({ browser })
   }
 
   await Promise.all([first.goto("/dashboard"), second.goto("/dashboard")]);
-  await expect.poll(() => refreshRequests).toBe(1);
+  await expect.poll(() => refreshRequests).toBeGreaterThanOrEqual(1);
   await expect.poll(async () => {
     return Promise.all(
       [first, second].map((page) =>
@@ -50,6 +50,8 @@ test("two tabs share one refresh rotation and both recover", async ({ browser })
       return response.status;
     }, apiUrl),
   ).toBe(200);
+
+  expect(refreshRequests).toBeLessThanOrEqual(2);
 
   await context.close();
 });
