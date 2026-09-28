@@ -1,4 +1,9 @@
-const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const PUBLIC_API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+const API_URL =
+  typeof window === "undefined"
+    ? process.env.API_URL ?? PUBLIC_API_URL
+    : PUBLIC_API_URL;
 const REFRESH_GENERATION_KEY = "vitacare-refresh-generation";
 
 export type ApiOptions = {
