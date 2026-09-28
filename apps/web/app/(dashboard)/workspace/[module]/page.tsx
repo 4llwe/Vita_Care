@@ -38,6 +38,26 @@ const timelineModules = new Set([
   "asesmen-keperawatan",
   "laporan",
 ]);
+const communicationModules: Record<string, { category: string; intro: string; prompt: string; links: Array<[string, string]> }> = {
+  telekonsultasi: {
+    category: "FOLLOW_UP",
+    intro: "Gunakan komunikasi ini untuk tindak lanjut terjadwal. Kondisi darurat harus menggunakan tombol Darurat atau layanan kegawatdaruratan.",
+    prompt: "Tuliskan pertanyaan, perkembangan gejala, atau kebutuhan tindak lanjut…",
+    links: [["/bookings", "Atur jadwal"], ["/monitoring", "Lihat monitoring"]],
+  },
+  "edukasi-pasien": {
+    category: "CARE_INSTRUCTION",
+    intro: "Materi dan instruksi ditampilkan dalam konteks rencana perawatan pasien dan tidak menggantikan arahan individual tenaga kesehatan.",
+    prompt: "Ajukan pertanyaan mengenai instruksi perawatan atau edukasi…",
+    links: [["/direktori#edukasi-kesehatan", "Pusat edukasi"], ["/workspace/rencana-perawatan", "Rencana perawatan"]],
+  },
+  "perawatan-luka": {
+    category: "SYMPTOM_REPORT",
+    intro: "Catat perubahan luka atau gejala untuk ditinjau tim. Jangan menunda bantuan jika ada perdarahan, demam, nyeri berat, atau penurunan kondisi.",
+    prompt: "Laporkan lokasi luka, perubahan, nyeri, cairan, bau, atau tanda lain…",
+    links: [["/monitoring", "Kondisi pasien"], ["/medical-records/new", "Dokumentasi klinis"]],
+  },
+};
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="medical-card">
@@ -104,7 +124,7 @@ export default function WorkspacePage() {
       await api(`/hah/episodes/${episodeId}/messages`, {
         method: "POST",
         token: getToken(),
-        body: { body: message.trim(), category: "GENERAL" },
+        body: { body: message.trim(), category: communicationModules[module]?.category ?? "GENERAL" },
       });
       setMessage("");
       setDetail(await api(`/hah/episodes/${episodeId}`, { token: getToken() }));
@@ -403,28 +423,37 @@ export default function WorkspacePage() {
           </div>
         </div>
       )}
-      {detail &&
-        ["telekonsultasi", "edukasi-pasien", "perawatan-luka"].includes(
-          module,
-        ) && (
+      {detail && communicationModules[module] && (
+        <div className="grid gap-4 lg:grid-cols-[.8fr_1.2fr]">
           <Card title={title}>
-            <p>
-              Modul ini menggunakan episode <b>{detail.code}</b> agar komunikasi, edukasi,
-              dan dokumentasi tetap berada pada konteks pasien yang benar.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link
-                href={`/hah/${detail.id}`}
-                className="rounded-xl bg-teal-700 px-4 py-3 font-bold text-white"
-              >
-                Buka workspace episode
-              </Link>
-              <Link href="/bookings" className="rounded-xl border px-4 py-3 font-bold">
-                Atur jadwal
-              </Link>
+            <p>{communicationModules[module].intro}</p>
+            {module === "edukasi-pasien" && detail.carePlan?.educationPlan ? (
+              <div className="mt-4 rounded-xl bg-teal-50 p-4"><b>Rencana edukasi pasien</b><p className="mt-2">{detail.carePlan.educationPlan}</p></div>
+            ) : null}
+            <div className="mt-4 grid gap-2">
+              {communicationModules[module].links.map(([href, label]) => (
+                <Link key={href} href={href} className="rounded-xl border p-3 font-bold">{label}</Link>
+              ))}
             </div>
           </Card>
-        )}
+          <Card title="Komunikasi dalam episode pasien">
+            <div className="max-h-72 space-y-3 overflow-y-auto rounded-xl bg-slate-50 p-3">
+              {(detail.messages ?? []).filter((item: any) => item.category === communicationModules[module].category).length ? (
+                (detail.messages ?? []).filter((item: any) => item.category === communicationModules[module].category).map((item: any) => (
+                  <article key={item.id} className="rounded-xl border bg-white p-3">
+                    <div className="flex justify-between gap-2 text-xs text-slate-500"><b className="text-slate-800">{item.sender?.name} · {item.sender?.role}</b><time>{new Date(item.createdAt).toLocaleString("id-ID")}</time></div>
+                    <p className="mt-2 whitespace-pre-wrap">{item.body}</p>
+                  </article>
+                ))
+              ) : <Empty>Belum ada komunikasi untuk modul ini.</Empty>}
+            </div>
+            <div className="mt-3 grid gap-2">
+              <textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={2000} aria-label={`Pesan ${title}`} className="min-h-24 rounded-xl border p-3" placeholder={communicationModules[module].prompt} />
+              <button type="button" onClick={sendMessage} disabled={!message.trim()} className="min-h-11 rounded-xl bg-teal-700 px-5 font-black text-white disabled:opacity-50">Kirim ke tim kesehatan</button>
+            </div>
+          </Card>
+        </div>
+      )}
       {detail && ["asuransi", "bpjs"].includes(module) && (
         <Card title={title}>
           <p>Informasi penjamin ditampilkan bersama tagihan yang berhak diakses. Verifikasi kepesertaan dan keputusan penjamin tetap dilakukan melalui kanal resmi.</p>

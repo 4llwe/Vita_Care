@@ -7,6 +7,14 @@ const services = [
   "Pemantauan dan dokumentasi pelayanan",
   "Koordinasi tindak lanjut pasien",
 ];
+const featuredServices = [
+  ["Kunjungan Dokter", "/informasi/layanan/kunjungan-dokter", "Asesmen dan evaluasi terapi di rumah sesuai kebutuhan klinis."],
+  ["Keperawatan di Rumah", "/informasi/layanan/home-nursing-keperawatan-di-rumah", "Asesmen, tindakan, monitoring, dan edukasi berdasarkan rencana asuhan."],
+  ["Laboratorium di Rumah", "/informasi/layanan/pemeriksaan-laboratorium-di-rumah", "Koordinasi spesimen, hasil, dan tindak lanjut nilai kritis."],
+  ["Perawatan Luka", "/informasi/layanan/perawatan-luka", "Dokumentasi perkembangan, edukasi, dan eskalasi tanda bahaya."],
+  ["Pasca-Rawat Inap", "/informasi/layanan/perawatan-pasca-rawat-inap", "Transisi aman dari rumah sakit menuju pemulihan di rumah."],
+  ["Telekonsultasi", "/informasi/layanan/telekonsultasi", "Komunikasi terjadwal untuk evaluasi dan tindak lanjut non-darurat."],
+];
 export default function HomePage() {
   return (
     <>
@@ -117,6 +125,18 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+        <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
+          <p className="eyebrow">Layanan unggulan</p>
+          <div className="mt-7 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {featuredServices.map(([title, href, copy]) => (
+              <Link key={title} href={href} className="medical-card group">
+                <h2 className="text-lg font-black text-slate-950 group-hover:text-teal-800">{title}</h2>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{copy}</p>
+                <span className="mt-5 inline-block text-sm font-black text-teal-700">Lihat alur layanan →</span>
+              </Link>
+            ))}
           </div>
         </section>
         <section className="mx-auto max-w-7xl px-5 py-16 lg:px-8">

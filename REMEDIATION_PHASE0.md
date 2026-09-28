@@ -56,5 +56,11 @@
 - Added dedicated doctor, nurse, finance, patient, and caregiver dashboard actions.
 - Added a responsive public mega-menu and a mobile-visible Login action while keeping Emergency access persistent.
 
+## Phase 1.7 — operational workspaces and service content
+- Replaced generic public copy with section-specific scope, workflows, privacy statements, and safety guidance.
+- Added clinically cautious descriptions for the thirteen requested Hospital at Home service categories.
+- Added featured service routes to the homepage without unverified outcome claims.
+- Upgraded teleconsultation, patient education, and wound-care workspaces with episode-scoped communication and relevant clinical context.
+
 ## Still pending for Phase 1+
 - Full public website information architecture and operator-approved service catalogue.
