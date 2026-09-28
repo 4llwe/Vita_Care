@@ -4,6 +4,17 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../../../lib/api";
 import { getToken } from "../../../../lib/auth";
+import { fetchMe, type Session } from "../../../../lib/session";
+
+const caregiverScopes = [
+  ["SUMMARY", "Ringkasan pasien"],
+  ["VITALS", "Kondisi dan tanda vital"],
+  ["CARE_PLAN", "Rencana perawatan"],
+  ["MEDICATIONS", "Obat"],
+  ["DIAGNOSTICS", "Hasil pemeriksaan"],
+  ["SCHEDULE", "Jadwal"],
+  ["MESSAGES", "Komunikasi tim"],
+] as const;
 
 const labels: Record<string, string> = {
   farmasi: "Farmasi",
@@ -78,6 +89,11 @@ export default function WorkspacePage() {
   const [detail, setDetail] = useState<any>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [session, setSession] = useState<Session | null>(null);
+  const [caregivers, setCaregivers] = useState<any[]>([]);
+  useEffect(() => {
+    fetchMe().then(setSession).catch(() => undefined);
+  }, []);
   useEffect(() => {
     api<any[]>("/hah/episodes", { token: getToken() })
       .then((rows) => {
@@ -93,6 +109,63 @@ export default function WorkspacePage() {
       .then(setDetail)
       .catch((e) => setError(e.message));
   }, [episodeId]);
+  const canManageCaregivers =
+    session &&
+    [session.role, ...(session.roles ?? [])].some((role) =>
+      ["PATIENT", "COORDINATOR", "SUPER_ADMIN"].includes(role),
+    );
+  useEffect(() => {
+    if (!episodeId || module !== "keluarga" || !canManageCaregivers) return;
+    api<any[]>(`/hah/episodes/${episodeId}/caregivers`, {
+      token: getToken(),
+    })
+      .then(setCaregivers)
+      .catch((e) => setError(e.message));
+  }, [episodeId, module, canManageCaregivers]);
+  async function grantCaregiver(form: HTMLFormElement) {
+    const data = new FormData(form);
+    const scope = caregiverScopes
+      .map(([value]) => value)
+      .filter((value) => data.has(`scope-${value}`));
+    try {
+      await api(`/hah/episodes/${episodeId}/caregivers`, {
+        method: "POST",
+        token: getToken(),
+        body: {
+          caregiverEmail: data.get("caregiverEmail"),
+          scope,
+          consentBy: data.get("consentBy"),
+          consentAt: new Date(String(data.get("consentAt"))).toISOString(),
+          expiresAt: data.get("expiresAt")
+            ? new Date(String(data.get("expiresAt"))).toISOString()
+            : undefined,
+        },
+      });
+      form.reset();
+      setCaregivers(
+        await api(`/hah/episodes/${episodeId}/caregivers`, {
+          token: getToken(),
+        }),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Akses caregiver gagal disimpan");
+    }
+  }
+  async function revokeCaregiver(caregiverId: string) {
+    try {
+      await api(
+        `/hah/episodes/${episodeId}/caregivers/${caregiverId}/revoke`,
+        { method: "PATCH", token: getToken() },
+      );
+      setCaregivers(
+        await api(`/hah/episodes/${episodeId}/caregivers`, {
+          token: getToken(),
+        }),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Akses caregiver gagal dicabut");
+    }
+  }
   const timeline = useMemo(() => {
     if (!detail) return [];
     return [
@@ -436,6 +509,136 @@ export default function WorkspacePage() {
               </Link>
             </div>
           </Card>
+          {detail.caregiverAccess ? (
+            <div className="lg:col-span-2">
+              <Card title="Persetujuan akses Anda">
+                <p>
+                  Akses aktif sejak{" "}
+                  {new Date(detail.caregiverAccess.consentAt).toLocaleString(
+                    "id-ID",
+                  )}
+                  {detail.caregiverAccess.expiresAt
+                    ? ` sampai ${new Date(
+                        detail.caregiverAccess.expiresAt,
+                      ).toLocaleString("id-ID")}`
+                    : " tanpa tanggal kedaluwarsa"}.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {detail.caregiverAccess.scope.map((scope: string) => (
+                    <span
+                      key={scope}
+                      className="rounded-full bg-teal-100 px-3 py-1 text-xs font-bold text-teal-900"
+                    >
+                      {scope.replaceAll("_", " ")}
+                    </span>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          ) : null}
+          {canManageCaregivers ? (
+            <div className="lg:col-span-2">
+              <Card title="Kelola consent caregiver">
+                <form
+                  className="grid gap-3 lg:grid-cols-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void grantCaregiver(event.currentTarget);
+                  }}
+                >
+                  <label className="font-semibold">
+                    Email akun caregiver
+                    <input
+                      name="caregiverEmail"
+                      type="email"
+                      required
+                      className="mt-1 min-h-11 w-full rounded-xl border px-3"
+                    />
+                  </label>
+                  <label className="font-semibold">
+                    Persetujuan diberikan oleh
+                    <input
+                      name="consentBy"
+                      required
+                      className="mt-1 min-h-11 w-full rounded-xl border px-3"
+                    />
+                  </label>
+                  <label className="font-semibold">
+                    Waktu persetujuan
+                    <input
+                      name="consentAt"
+                      type="datetime-local"
+                      required
+                      className="mt-1 min-h-11 w-full rounded-xl border px-3"
+                    />
+                  </label>
+                  <label className="font-semibold">
+                    Berlaku sampai
+                    <input
+                      name="expiresAt"
+                      type="datetime-local"
+                      className="mt-1 min-h-11 w-full rounded-xl border px-3"
+                    />
+                  </label>
+                  <fieldset className="lg:col-span-2">
+                    <legend className="font-bold">Data yang diizinkan</legend>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {caregiverScopes.map(([value, label]) => (
+                        <label
+                          key={value}
+                          className="flex items-center gap-2 rounded-xl border p-3"
+                        >
+                          <input
+                            type="checkbox"
+                            name={`scope-${value}`}
+                            defaultChecked={value === "SUMMARY"}
+                            disabled={value === "SUMMARY"}
+                          />
+                          <input
+                            type="hidden"
+                            name={value === "SUMMARY" ? `scope-${value}` : ""}
+                            value={value}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  <button className="min-h-11 rounded-xl bg-teal-700 px-4 font-bold text-white">
+                    Simpan persetujuan
+                  </button>
+                </form>
+                <div className="mt-5 space-y-2 border-t pt-4">
+                  {caregivers.map((access) => (
+                    <div
+                      key={access.id}
+                      className="flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <b>{access.caregiver.name}</b>
+                        <p className="text-xs text-slate-500">
+                          {access.caregiver.email} ·{" "}
+                          {(access.scope ?? []).join(", ")}
+                        </p>
+                      </div>
+                      {!access.revokedAt ? (
+                        <button
+                          onClick={() => revokeCaregiver(access.caregiver.id)}
+                          className="min-h-11 rounded-xl border border-red-300 px-4 font-bold text-red-700"
+                        >
+                          Cabut akses
+                        </button>
+                      ) : (
+                        <span className="text-xs font-bold text-slate-500">
+                          Dicabut
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          ) : null}
           <div className="lg:col-span-2">
             <Card title="Komunikasi aman dengan tim kesehatan">
               <div className="max-h-80 space-y-3 overflow-y-auto rounded-xl bg-slate-50 p-3">

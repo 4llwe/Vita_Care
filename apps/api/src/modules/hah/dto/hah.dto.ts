@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEmail,
   IsIn,
   IsInt,
   IsNumber,
@@ -14,6 +15,7 @@ import {
   Min,
   MinLength,
 } from "class-validator";
+import { CAREGIVER_SCOPES } from "../caregiver-scope";
 
 export class CreatePatientDto {
   @IsString() @MinLength(2) fullName!: string;
@@ -207,8 +209,12 @@ export class UpdateEquipmentStatusDto {
 }
 
 export class GrantCaregiverAccessDto {
-  @IsString() caregiverUserId!: string;
-  @IsArray() @ArrayMinSize(1) scope!: string[];
+  @IsOptional() @IsString() caregiverUserId?: string;
+  @IsOptional() @IsEmail() caregiverEmail?: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsIn(CAREGIVER_SCOPES, { each: true })
+  scope!: string[];
   @IsString() @MinLength(2) consentBy!: string;
   @IsDateString() consentAt!: string;
   @IsOptional() @IsDateString() expiresAt?: string;

@@ -38,16 +38,25 @@ export function PatientClinicalSummary() {
         Memuat kondisi klinis…
       </div>
     );
-  const o = d.observations?.[0];
+  const caregiverScope: string[] | null = d.caregiverAccess?.scope ?? null;
+  const canSeeVitals = !caregiverScope || caregiverScope.includes("VITALS");
+  const canSeeSchedule = !caregiverScope || caregiverScope.includes("SCHEDULE");
+  const canSeeMedication =
+    !caregiverScope || caregiverScope.includes("MEDICATIONS");
+  const canSeeDiagnostics =
+    !caregiverScope || caregiverScope.includes("DIAGNOSTICS");
+  const o = canSeeVitals ? d.observations?.[0] : null;
   const risk =
-    o?.ewsRisk === "critical"
+    !canSeeVitals
+      ? ["Akses Terbatas", "bg-slate-100 text-slate-700"]
+      : o?.ewsRisk === "critical"
       ? ["Darurat", "bg-red-100 text-red-800"]
       : o?.ewsRisk === "high"
         ? ["Perlu Perhatian", "bg-orange-100 text-orange-800"]
         : o?.ewsRisk === "medium"
           ? ["Perlu Pemantauan", "bg-amber-100 text-amber-800"]
           : ["Stabil", "bg-emerald-100 text-emerald-800"];
-  const visit = d.visits?.find(
+  const visit = canSeeSchedule && d.visits?.find(
     (x: any) => new Date(x.scheduledStart) > new Date(),
   );
   const message =
@@ -86,23 +95,33 @@ export function PatientClinicalSummary() {
         {[
           [
             "Kunjungan berikutnya",
-            visit
+            !canSeeSchedule
+              ? "Tidak termasuk consent"
+              : visit
               ? new Date(visit.scheduledStart).toLocaleString("id-ID")
               : "Belum dijadwalkan",
           ],
           [
             "Tanda vital terbaru",
-            o ? `${o.systolic}/${o.diastolic} · SpO₂ ${o.spo2}%` : "Belum ada",
+            !canSeeVitals
+              ? "Tidak termasuk consent"
+              : o
+                ? `${o.systolic}/${o.diastolic} · SpO₂ ${o.spo2}%`
+                : "Belum ada",
           ],
           [
             "Obat hari ini",
-            todayDoses.length
+            !canSeeMedication
+              ? "Tidak termasuk consent"
+              : todayDoses.length
               ? `${givenToday}/${todayDoses.length} dosis tercatat`
               : `${d.medicationOrders?.filter((x: any) => x.status === "ACTIVE").length ?? 0} order aktif`,
           ],
           [
             "Hasil laboratorium",
-            `${d.diagnosticOrders?.filter((x: any) => x.status === "RESULTED").length ?? 0} hasil tersedia`,
+            !canSeeDiagnostics
+              ? "Tidak termasuk consent"
+              : `${d.diagnosticOrders?.filter((x: any) => x.status === "RESULTED").length ?? 0} hasil tersedia`,
           ],
         ].map(([a, b]) => (
           <div key={a} className="medical-card">

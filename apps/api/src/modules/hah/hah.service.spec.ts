@@ -215,3 +215,83 @@ describe("HaHService emergency response", () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe("HaHService caregiver privacy", () => {
+  it("mewajibkan scope SUMMARY pada consent caregiver", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          patientId: "patient-1",
+        }),
+      },
+      user: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "caregiver-1",
+          role: "CAREGIVER",
+          isActive: true,
+        }),
+      },
+    };
+
+    await expect(
+      new HaHService(prisma, {} as any).grantCaregiverAccess(
+        "episode-1",
+        {
+          caregiverEmail: "caregiver@example.test",
+          scope: ["VITALS"],
+          consentBy: "Pasien Uji",
+          consentAt: "2026-09-28T00:00:00Z",
+        },
+        "patient-user",
+      ),
+    ).rejects.toThrow(/SUMMARY/);
+  });
+
+  it("meredaksi data di luar scope caregiver", async () => {
+    const result: any = {
+      id: "episode-1",
+      patientId: "patient-1",
+      patient: {
+        portalUserId: "patient-user",
+        nationalId: "SECRET-ID",
+      },
+      observations: [{ id: "obs-1" }],
+      alerts: [{ id: "alert-1" }],
+      eligibility: { id: "eligibility-1" },
+      carePlan: { id: "plan-1" },
+      carePlanRevisions: [{ id: "revision-1" }],
+      clinicalEvaluations: [{ id: "evaluation-1" }],
+      transfers: [],
+      equipmentAssignments: [],
+      medicationOrders: [{ id: "med-1" }],
+      diagnosticOrders: [{ id: "lab-1" }],
+      visits: [{ id: "visit-1" }],
+      messages: [{ id: "message-1" }],
+      emergencyEvents: [{ id: "emergency-1" }],
+    };
+    const prisma: any = {
+      haHEpisode: { findFirstOrThrow: jest.fn().mockResolvedValue(result) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+      haHCaregiverAccess: {
+        findFirst: jest.fn().mockResolvedValue({
+          scope: ["SUMMARY", "SCHEDULE"],
+          consentAt: new Date("2026-09-28T00:00:00Z"),
+          expiresAt: null,
+        }),
+      },
+    };
+
+    const visible: any = await new HaHService(prisma, {} as any).getEpisode(
+      "episode-1",
+      { id: "caregiver-1", role: "CAREGIVER", roles: ["CAREGIVER"] } as any,
+    );
+
+    expect(visible.patient.nationalId).toBeNull();
+    expect(visible.visits).toHaveLength(1);
+    expect(visible.observations).toEqual([]);
+    expect(visible.medicationOrders).toEqual([]);
+    expect(visible.messages).toEqual([]);
+    expect(visible.emergencyEvents).toEqual([]);
+  });
+});
