@@ -62,5 +62,12 @@
 - Added featured service routes to the homepage without unverified outcome claims.
 - Upgraded teleconsultation, patient education, and wound-care workspaces with episode-scoped communication and relevant clinical context.
 
+## Phase 1.8 — operational finance, administration, and role verification
+- Added structured payer and claim tracking for self-pay, private insurance, BPJS/JKN, and corporate coverage without replacing the existing invoice flow.
+- Payments now charge only the patient-responsibility balance after approved coverage; claim changes are validated and written to the audit trail.
+- Added a restricted user-access workspace for Super Admins, including primary/additional role management, account activation, session revocation, and last-Super-Admin protection.
+- Added role-scoped report and system-readiness pages without exposing credentials or infrastructure secrets.
+- Added end-to-end mobile navigation coverage for Doctor, Nurse, Finance, Patient, and Caregiver roles.
+
 ## Still pending for Phase 1+
 - Full public website information architecture and operator-approved service catalogue.

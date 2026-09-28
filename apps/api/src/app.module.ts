@@ -21,6 +21,7 @@ import { NotificationModule } from "./modules/notification/notification.module";
 import { HaHModule } from "./modules/hah/hah.module";
 import { PublicRequestModule } from "./modules/public-request/public-request.module";
 import { MenuModule } from "./modules/menu/menu.module";
+import { UserAdminModule } from "./modules/user-admin/user-admin.module";
 import { JobQueueModule } from "./common/jobs/job-queue.module";
 
 @Module({
@@ -31,6 +32,7 @@ import { JobQueueModule } from "./common/jobs/job-queue.module";
     HaHModule,
     PublicRequestModule,
     MenuModule,
+    UserAdminModule,
     AuthModule,
     FindingsModule,
     BookingModule,

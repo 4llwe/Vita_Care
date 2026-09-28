@@ -1,9 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { InvoiceStatus } from '@prisma/client';
+import { ClaimStatus, InvoiceStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { PaymentService } from './payment.service';
 import { NotificationService } from '../notification/notification.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import { UpdateCoverageDto } from './dto/update-coverage.dto';
 
 @Injectable()
 export class BillingService {
@@ -62,10 +63,12 @@ export class BillingService {
     await this.assertPatientOwnership(inv.id, actor);
     if (inv.status === InvoiceStatus.PAID) throw new BadRequestException('Invoice sudah lunas');
 
+    const outstanding = inv.total - inv.coveredAmount;
+    if (outstanding <= 0) throw new BadRequestException('Tagihan pasien telah ditanggung penuh');
     const orderId = `${inv.code}-${Date.now()}`;
     const charge = await this.payment.createTransaction({
       orderId,
-      grossAmount: inv.total,
+      grossAmount: outstanding,
       customerName: inv.patientName,
       items: inv.items.map((it) => ({ id: it.id, name: it.description, price: it.unitPrice, quantity: it.qty })),
     });
@@ -117,6 +120,46 @@ export class BillingService {
       });
     }
     return { ok: true, status: mapped };
+  }
+
+  async updateCoverage(id: string, dto: UpdateCoverageDto, actorId: string) {
+    const invoice = await this.prisma.invoice.findUnique({ where: { id } });
+    if (!invoice) throw new NotFoundException('Invoice tidak ditemukan');
+    if (dto.coveredAmount > invoice.total) {
+      throw new BadRequestException('Nilai pertanggungan tidak boleh melebihi total tagihan');
+    }
+    if (dto.payerType === 'SELF_PAY' && dto.coveredAmount > 0) {
+      throw new BadRequestException('Pembayaran mandiri tidak memiliki nilai pertanggungan');
+    }
+    const fullyCovered = dto.claimStatus === ClaimStatus.PAID && dto.coveredAmount >= invoice.total;
+    const updated = await this.prisma.invoice.update({
+      where: { id },
+      data: {
+        payerType: dto.payerType,
+        insurerName: dto.insurerName?.trim() || null,
+        memberNumber: dto.memberNumber?.trim() || null,
+        claimNumber: dto.claimNumber?.trim() || null,
+        claimStatus: dto.claimStatus,
+        coveredAmount: dto.coveredAmount,
+        ...(fullyCovered ? { status: InvoiceStatus.PAID, paidAt: new Date() } : {}),
+      },
+      include: { items: true, payments: true },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action: 'INVOICE_COVERAGE_UPDATED',
+        entity: 'Invoice',
+        entityId: id,
+        after: {
+          payerType: dto.payerType,
+          claimStatus: dto.claimStatus,
+          claimNumber: dto.claimNumber,
+          coveredAmount: dto.coveredAmount,
+        },
+      },
+    });
+    return updated;
   }
 
   async findOne(id: string, actor: { id: string; role: string }) { await this.assertPatientOwnership(id, actor); return this.prisma.invoice.findUniqueOrThrow({ where: { id }, include: { items: true, payments: true } }); }
