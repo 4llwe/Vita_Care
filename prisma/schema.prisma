@@ -85,6 +85,12 @@ enum DocumentStatus {
   ARCHIVED
 }
 
+enum DocumentAccessLevel {
+  READ
+  EDIT
+  REVIEW
+}
+
 enum ReferralStatus {
   REQUESTED
   ACCEPTED
@@ -113,6 +119,8 @@ model User {
   signedRecords MedicalRecord[] @relation("RecordSigner")
   risks       RiskRegister[] @relation("RiskOwner")
   documents   Document[] @relation("DocOwner")
+  documentAccesses DocumentAccess[] @relation("DocumentAccessUser")
+  documentAccessGrants DocumentAccess[] @relation("DocumentAccessGranter")
   audits      AuditExecution[] @relation("AuditAuditor")
   healthWorkerProfile HealthWorker? @relation("HealthWorkerAccount")
   caregiverAccesses HaHCaregiverAccess[] @relation("CaregiverUser")
@@ -453,6 +461,23 @@ model Document {
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   versions      DocumentVersion[]
+  accesses      DocumentAccess[]
+}
+
+model DocumentAccess {
+  id          String              @id @default(cuid())
+  documentId  String
+  document    Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User                @relation("DocumentAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+  level       DocumentAccessLevel
+  grantedById String
+  grantedBy   User                @relation("DocumentAccessGranter", fields: [grantedById], references: [id])
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([documentId, userId])
+  @@index([userId, level])
 }
 
 model DocumentVersion {

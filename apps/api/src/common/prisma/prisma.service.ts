@@ -1,5 +1,12 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
+
+export type DatabaseActor = {
+  id: string;
+  role: string;
+  roles?: string[];
+};
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
@@ -7,5 +14,17 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
   async onModuleDestroy() {
     await this.$disconnect();
+  }
+
+  async withActor<T>(
+    actor: DatabaseActor,
+    callback: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    const roles = [...new Set([actor.role, ...(actor.roles ?? [])])].join(",");
+    return this.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.user_id', ${actor.id}, true)`;
+      await tx.$executeRaw`SELECT set_config('app.roles', ${roles}, true)`;
+      return callback(tx);
+    });
   }
 }
