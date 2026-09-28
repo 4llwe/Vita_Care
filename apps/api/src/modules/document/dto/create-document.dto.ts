@@ -1,4 +1,5 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { DocumentAccessLevel } from '@prisma/client';
+import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateDocumentDto {
   @IsString()
@@ -34,4 +35,12 @@ export class ReviewDto {
   @IsOptional()
   @IsString()
   note?: string;
+}
+
+export class SetDocumentAccessDto {
+  @IsString()
+  userId!: string;
+
+  @IsEnum(DocumentAccessLevel)
+  level!: DocumentAccessLevel;
 }

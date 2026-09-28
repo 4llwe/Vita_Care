@@ -38,7 +38,12 @@
 - Booking and HaH creation paths dual-write canonical records while legacy fields remain available.
 - Added a database constraint requiring each care assignment to target exactly one appointment or HaH episode.
 
+## Phase 1.4 — document row-level security
+- Added explicit per-user document grants for READ, EDIT, and REVIEW access.
+- Document operations now enforce owner, grant, and privileged-role checks in the API.
+- PostgreSQL RLS policies protect documents, versions, and grants using transaction-scoped actor context.
+- Document ownership, version authorship, and review identity are derived from the authenticated actor.
+
 ## Still pending for Phase 1+
-- PostgreSQL RLS and object-level document authorization.
 - Redis-backed durable jobs and horizontally safe schedulers.
 - Full public website information architecture and operator-approved service catalogue.
