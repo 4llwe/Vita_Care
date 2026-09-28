@@ -26,6 +26,8 @@ const labels: Record<string, string> = {
   "resep-obat": "Resep & Obat",
   "riwayat-pelayanan": "Riwayat Pelayanan",
   keluarga: "Keluarga & Caregiver",
+  asuransi: "Asuransi",
+  bpjs: "BPJS / JKN",
 };
 const medicationModules = new Set(["farmasi", "resep", "resep-obat", "pemberian-obat"]);
 const diagnosticModules = new Set(["laboratorium", "hasil-laboratorium"]);
@@ -423,6 +425,15 @@ export default function WorkspacePage() {
             </div>
           </Card>
         )}
+      {detail && ["asuransi", "bpjs"].includes(module) && (
+        <Card title={title}>
+          <p>Informasi penjamin ditampilkan bersama tagihan yang berhak diakses. Verifikasi kepesertaan dan keputusan penjamin tetap dilakukan melalui kanal resmi.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/invoices" className="rounded-xl bg-teal-700 px-4 py-3 font-bold text-white">Buka tagihan</Link>
+            <Link href="/direktori#pembayaran" className="rounded-xl border px-4 py-3 font-bold">Informasi pembayaran</Link>
+          </div>
+        </Card>
+      )}
       {detail && ["pengguna", "pengaturan"].includes(module) && (
         <Card title={title}>
           <p>

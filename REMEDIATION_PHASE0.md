@@ -50,5 +50,11 @@
 - CAPA reminders and queue reconciliation use Redis job schedulers, so multiple worker replicas do not duplicate schedules.
 - API instances only produce jobs; horizontally scaled workers coordinate processing through Redis locks.
 
+## Phase 1.6 — role navigation and dashboard UX
+- Unified direct DOCTOR, NURSE, FINANCE, PATIENT, and CAREGIVER roles with the legacy HEALTH_WORKER navigation path.
+- Added role-scoped dashboard analytics so clinical and patient accounts never receive global finance or governance metrics.
+- Added dedicated doctor, nurse, finance, patient, and caregiver dashboard actions.
+- Added a responsive public mega-menu and a mobile-visible Login action while keeping Emergency access persistent.
+
 ## Still pending for Phase 1+
 - Full public website information architecture and operator-approved service catalogue.

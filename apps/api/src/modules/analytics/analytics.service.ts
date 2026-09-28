@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { BookingStatus, CapaStatus, InvoiceStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from '../../common/auth/actor';
 
 export type DashboardSummary = {
   bookings: { total: number; aktif: number; selesai: number };
@@ -44,47 +45,103 @@ export type MasterAnalytics = {
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async dashboard(): Promise<DashboardSummary> {
-    const [
-      totalBookings,
-      aktifBookings,
-      selesaiBookings,
-      paidAgg,
-      pendingAgg,
-      findingsGroup,
-      totalFindings,
-      capaOpen,
-      capaProgress,
-      capaVerified,
-      capaOverdue,
-      totalRisks,
-      highRisks,
-    ] = await Promise.all([
-      this.prisma.booking.count(),
+  async dashboard(actor: AuthActor): Promise<DashboardSummary> {
+    const management = actorHasAnyRole(actor, [
+      'DIRECTOR',
+      'SUPER_ADMIN',
+      'COORDINATOR',
+    ]);
+    const governance = actorHasAnyRole(actor, [
+      'SUPERVISORY_BOARD',
+      'AUDITOR',
+      'UNIT_HEAD',
+    ]);
+    const finance = actorHasAnyRole(actor, ['FINANCE']);
+    const clinical = actorHasAnyRole(actor, CLINICAL_ROLES);
+    const patient = actorHasAnyRole(actor, ['PATIENT']);
+
+    const bookingWhere = management || finance
+      ? undefined
+      : clinical
+        ? { healthWorker: { userId: actor.id, isActive: true } }
+        : patient
+          ? { patientUserId: actor.id }
+          : { id: '__none__' };
+
+    const [totalBookings, aktifBookings, selesaiBookings] = await Promise.all([
+      this.prisma.booking.count({ where: bookingWhere }),
       this.prisma.booking.count({
-        where: { status: { in: [BookingStatus.DIKONFIRMASI, BookingStatus.DITUGASKAN, BookingStatus.DALAM_PERJALANAN, BookingStatus.BERLANGSUNG] } },
+        where: {
+          ...bookingWhere,
+          status: {
+            in: [
+              BookingStatus.DIKONFIRMASI,
+              BookingStatus.DITUGASKAN,
+              BookingStatus.DALAM_PERJALANAN,
+              BookingStatus.BERLANGSUNG,
+            ],
+          },
+        },
       }),
-      this.prisma.booking.count({ where: { status: { in: [BookingStatus.SELESAI, BookingStatus.DIEVALUASI] } } }),
-      this.prisma.invoice.aggregate({ _sum: { total: true }, where: { status: InvoiceStatus.PAID } }),
-      this.prisma.invoice.aggregate({ _sum: { total: true }, where: { status: { in: [InvoiceStatus.PENDING, InvoiceStatus.UNPAID] } } }),
-      this.prisma.finding.groupBy({ by: ['category'], _count: { _all: true } }),
-      this.prisma.finding.count(),
-      this.prisma.capa.count({ where: { status: CapaStatus.OPEN } }),
-      this.prisma.capa.count({ where: { status: CapaStatus.IN_PROGRESS } }),
-      this.prisma.capa.count({ where: { status: CapaStatus.VERIFIED } }),
-      this.prisma.capa.count({ where: { status: CapaStatus.OVERDUE } }),
-      this.prisma.riskRegister.count(),
-      this.prisma.riskRegister.count({ where: { level: { in: ['HIGH', 'CRITICAL'] } } }),
+      this.prisma.booking.count({
+        where: {
+          ...bookingWhere,
+          status: { in: [BookingStatus.SELESAI, BookingStatus.DIEVALUASI] },
+        },
+      }),
+    ]);
+
+    const canSeeRevenue = management || finance;
+    const canSeeGovernance = management || governance;
+    const [paidAgg, pendingAgg, findingsGroup, totalFindings, capaOpen, capaProgress,
+      capaVerified, capaOverdue, totalRisks, highRisks] = await Promise.all([
+      canSeeRevenue
+        ? this.prisma.invoice.aggregate({
+            _sum: { total: true },
+            where: { status: InvoiceStatus.PAID },
+          })
+        : Promise.resolve({ _sum: { total: 0 } }),
+      canSeeRevenue
+        ? this.prisma.invoice.aggregate({
+            _sum: { total: true },
+            where: { status: { in: [InvoiceStatus.PENDING, InvoiceStatus.UNPAID] } },
+          })
+        : Promise.resolve({ _sum: { total: 0 } }),
+      canSeeGovernance
+        ? this.prisma.finding.groupBy({ by: ['category'], _count: { _all: true } })
+        : Promise.resolve([]),
+      canSeeGovernance ? this.prisma.finding.count() : Promise.resolve(0),
+      canSeeGovernance
+        ? this.prisma.capa.count({ where: { status: CapaStatus.OPEN } })
+        : Promise.resolve(0),
+      canSeeGovernance
+        ? this.prisma.capa.count({ where: { status: CapaStatus.IN_PROGRESS } })
+        : Promise.resolve(0),
+      canSeeGovernance
+        ? this.prisma.capa.count({ where: { status: CapaStatus.VERIFIED } })
+        : Promise.resolve(0),
+      canSeeGovernance
+        ? this.prisma.capa.count({ where: { status: CapaStatus.OVERDUE } })
+        : Promise.resolve(0),
+      canSeeGovernance ? this.prisma.riskRegister.count() : Promise.resolve(0),
+      canSeeGovernance
+        ? this.prisma.riskRegister.count({ where: { level: { in: ['HIGH', 'CRITICAL'] } } })
+        : Promise.resolve(0),
     ]);
 
     const perKategori: Record<string, number> = {};
-    for (const g of findingsGroup) perKategori[g.category] = (g as any)._count._all;
+    for (const group of findingsGroup) perKategori[group.category] = (group as any)._count._all;
 
     return {
       bookings: { total: totalBookings, aktif: aktifBookings, selesai: selesaiBookings },
       revenue: { lunas: paidAgg._sum.total ?? 0, tertunda: pendingAgg._sum.total ?? 0 },
       findings: { total: totalFindings, perKategori },
-      capa: { open: capaOpen, inProgress: capaProgress, verified: capaVerified, overdue: capaOverdue },
+      capa: {
+        open: capaOpen,
+        inProgress: capaProgress,
+        verified: capaVerified,
+        overdue: capaOverdue,
+      },
       risks: { total: totalRisks, tinggi: highRisks },
     };
   }

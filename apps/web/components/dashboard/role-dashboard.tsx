@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { rupiah } from "../../lib/format";
 import type { DashboardSummary } from "../../lib/types";
-import type { Role } from "../../lib/session";
+import type { ClinicalPersona, Role } from "../../lib/session";
 import { KpiCard } from "../kpi-card";
 import { DownloadButton } from "../download-button";
 import { PatientClinicalSummary } from "./patient-clinical-summary";
@@ -84,9 +84,11 @@ function CapaStatus({ data }: { data: DashboardSummary }) {
 /** Render dashboard sesuai peran pengguna. */
 export function RoleDashboard({
   role,
+  persona,
   data,
 }: {
   role: Role;
+  persona: ClinicalPersona;
   data: DashboardSummary;
 }) {
   // DIREKTUR & SUPER ADMIN — pandangan menyeluruh
@@ -232,8 +234,27 @@ export function RoleDashboard({
     );
   }
 
+  if (persona === "finance") {
+    return (
+      <div className="space-y-6">
+        <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <KpiCard label="Tagihan Lunas" value={rupiah(data.revenue.lunas)} tone="green" />
+          <KpiCard label="Tagihan Tertunda" value={rupiah(data.revenue.tertunda)} tone="amber" />
+          <KpiCard label="Pemesanan Aktif" value={data.bookings.aktif} tone="blue" />
+          <KpiCard label="Total Pemesanan" value={data.bookings.total} tone="green" />
+        </section>
+        <QuickLinks links={[
+          { href: "/invoices", label: "Tagihan & Pembayaran", icon: "T" },
+          { href: "/master", label: "Paket & Tarif", icon: "P" },
+          { href: "/workspace/asuransi", label: "Asuransi", icon: "A" },
+          { href: "/workspace/laporan", label: "Laporan Keuangan", icon: "L" },
+        ]} />
+      </div>
+    );
+  }
+
   // TENAGA KESEHATAN — tugas kunjungan & dokumentasi klinis
-  if (role === "HEALTH_WORKER") {
+  if (persona === "doctor" || persona === "nurse") {
     return (
       <div className="space-y-6">
         <section className="grid grid-cols-2 gap-4 lg:grid-cols-3">
@@ -254,34 +275,44 @@ export function RoleDashboard({
           />
         </section>
         <QuickLinks
-          links={[
-            { href: "/bookings", label: "Jadwal Kunjungan", icon: "🗓️" },
-            {
-              href: "/medical-records/new",
-              label: "Isi Rekam Medis",
-              icon: "🩺",
-            },
-            { href: "/referrals", label: "Buat Rujukan", icon: "🏥" },
+          links={persona === "nurse" ? [
+            { href: "/hah", label: "Pasien Tugas", icon: "P" },
+            { href: "/monitoring", label: "Catat Tanda Vital", icon: "V" },
+            { href: "/workspace/pemberian-obat", label: "Pemberian Obat", icon: "O" },
+            { href: "/hah?focus=alerts", label: "Eskalasi Klinis", icon: "!" },
+          ] : [
+            { href: "/hah", label: "Daftar Pasien", icon: "P" },
+            { href: "/monitoring", label: "Monitoring Pasien", icon: "M" },
+            { href: "/medical-records/new", label: "Isi Rekam Medis", icon: "R" },
+            { href: "/referrals", label: "Buat Rujukan", icon: "!" },
           ]}
         />
       </div>
     );
   }
 
-  // PASIEN / KELUARGA — status klinis dan akses perawatan
+  // PASIEN / KELUARGA — status klinis dan akses perawatan sesuai consent.
   return (
     <div className="space-y-6">
+      {persona === "caregiver" ? (
+        <section className="rounded-2xl border border-teal-200 bg-teal-50 p-5">
+          <p className="text-xs font-black uppercase tracking-[.18em] text-teal-700">Dashboard keluarga</p>
+          <h2 className="mt-2 text-xl font-black text-slate-950">Pendampingan pasien sesuai persetujuan aktif</h2>
+          <p className="mt-2 text-sm text-slate-600">Data yang tampil dibatasi oleh consent, scope caregiver, dan masa berlaku akses.</p>
+        </section>
+      ) : null}
       <PatientClinicalSummary />
       <QuickLinks
-        links={[
-          { href: "/portal", label: "Portal Pasien", icon: "P" },
+        links={persona === "caregiver" ? [
+          { href: "/workspace/keluarga", label: "Kondisi & Komunikasi", icon: "K" },
+          { href: "/bookings", label: "Jadwal Perawatan", icon: "J" },
+          { href: "/workspace/rencana-perawatan", label: "Instruksi Perawatan", icon: "I" },
+          { href: "/workspace/resep-obat", label: "Obat Pasien", icon: "O" },
+        ] : [
+          { href: "/portal", label: "Pesan Layanan", icon: "P" },
           { href: "/bookings", label: "Jadwal Saya", icon: "J" },
           { href: "/invoices", label: "Tagihan Saya", icon: "T" },
-          {
-            href: "/workspace/keluarga",
-            label: "Keluarga & Caregiver",
-            icon: "K",
-          },
+          { href: "/workspace/keluarga", label: "Keluarga & Caregiver", icon: "K" },
         ]}
       />
     </div>

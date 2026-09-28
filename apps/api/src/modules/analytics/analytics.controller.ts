@@ -5,6 +5,8 @@ import { ReportingService } from './reporting.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthActor } from '../../common/auth/actor';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -15,9 +17,12 @@ export class AnalyticsController {
   ) {}
 
   @Get('analytics/dashboard')
-  @Roles('DIRECTOR', 'SUPERVISORY_BOARD', 'SUPER_ADMIN', 'AUDITOR', 'COORDINATOR')
-  dashboard() {
-    return this.analytics.dashboard();
+  @Roles(
+    'DIRECTOR', 'SUPERVISORY_BOARD', 'SUPER_ADMIN', 'AUDITOR', 'UNIT_HEAD',
+    'COORDINATOR', 'HEALTH_WORKER', 'DOCTOR', 'NURSE', 'FINANCE', 'PATIENT', 'CAREGIVER',
+  )
+  dashboard(@CurrentUser() actor: AuthActor) {
+    return this.analytics.dashboard(actor);
   }
 
   @Get('analytics/master')
