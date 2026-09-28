@@ -724,6 +724,19 @@ enum HaHEvaluationDisposition {
   TRANSFER_RECOMMENDED
 }
 
+enum EmergencyAction {
+  MEDICAL_TEAM
+  HOSPITAL
+  AMBULANCE
+  LOCATION_SHARED
+}
+
+enum EmergencyEventStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
 model HaHPatient {
   id                 String       @id @default(cuid())
   canonicalPatientId String?      @unique
@@ -784,6 +797,7 @@ model HaHEpisode {
   equipmentAssignments  HaHEquipmentAssignment[]
   carePlanRevisions      HaHCarePlanRevision[]
   clinicalEvaluations    HaHClinicalEvaluation[]
+  emergencyEvents        HaHEmergencyEvent[]
   messages               HaHClinicalMessage[]
   breakGlassAccesses     HaHBreakGlassAccess[]
   careAssignments       CareAssignment[]
@@ -865,6 +879,27 @@ model HaHClinicalEvaluation {
 
   @@index([episodeId, evaluatedAt])
   @@index([disposition, evaluatedAt])
+}
+
+model HaHEmergencyEvent {
+  id                  String               @id @default(cuid())
+  episodeId           String
+  episode             HaHEpisode           @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  actorId             String
+  action              EmergencyAction
+  latitude            Float?
+  longitude           Float?
+  note                String?
+  status              EmergencyEventStatus @default(OPEN)
+  acknowledgedById    String?
+  acknowledgedAt      DateTime?
+  resolvedById        String?
+  resolvedAt          DateTime?
+  resolution          String?
+  createdAt           DateTime             @default(now())
+
+  @@index([status, createdAt])
+  @@index([episodeId, createdAt])
 }
 
 model HaHObservation {

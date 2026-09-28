@@ -154,3 +154,64 @@ describe("HaHService medication adherence", () => {
     expect(notify.enqueueClinical).toHaveBeenCalled();
   });
 });
+
+describe("HaHService emergency response", () => {
+  it("mencatat tindakan darurat, audit, dan notifikasi klinis", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          code: "HAH-1",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      haHEmergencyEvent: {
+        create: jest.fn().mockResolvedValue({
+          id: "emergency-1",
+          episodeId: "episode-1",
+          action: "AMBULANCE",
+          latitude: -8.58,
+          longitude: 116.1,
+        }),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const notify = { enqueueClinical: jest.fn().mockResolvedValue([]) };
+
+    const event = await new HaHService(
+      prisma,
+      notify as any,
+    ).createEmergencyEvent(
+      "episode-1",
+      { action: "AMBULANCE", latitude: -8.58, longitude: 116.1 },
+      "patient-1",
+    );
+
+    expect(event.id).toBe("emergency-1");
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+    expect(notify.enqueueClinical).toHaveBeenCalledWith(
+      expect.stringMatching(/DARURAT/),
+      expect.stringMatching(/HAH-1/),
+    );
+  });
+
+  it("menolak koordinat darurat yang tidak lengkap", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          code: "HAH-1",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+    };
+
+    await expect(
+      new HaHService(prisma, {} as any).createEmergencyEvent(
+        "episode-1",
+        { action: "LOCATION_SHARED", latitude: -8.58 },
+        "patient-1",
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});

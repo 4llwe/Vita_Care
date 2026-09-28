@@ -21,6 +21,7 @@ import {
   AssessEligibilityDto,
   CarePlanDto,
   CreateClinicalEvaluationDto,
+  CreateEmergencyEventDto,
   CreateClinicalProtocolDto,
   CreateDiagnosticOrderDto,
   CreateEquipmentAssignmentDto,
@@ -33,6 +34,7 @@ import {
   GrantCaregiverAccessDto,
   RecordObservationDto,
   ResolveAlertDto,
+  ResolveEmergencyEventDto,
   SendClinicalMessageDto,
   TransferDto,
   UpdateEquipmentStatusDto,
@@ -256,6 +258,49 @@ export class HaHController {
     @Query("status") status?: HaHEpisodeStatus,
   ) {
     return this.hah.listEpisodes(status, u);
+  }
+
+  @Post("episodes/:id/emergency-events")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  createEmergencyEvent(
+    @Param("id") id: string,
+    @Body() dto: CreateEmergencyEventDto,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.createEmergencyEvent(id, dto, u.id);
+  }
+
+  @Get("emergency-events/open")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  openEmergencyEvents() {
+    return this.hah.listOpenEmergencyEvents();
+  }
+
+  @Patch("emergency-events/:id/acknowledge")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  acknowledgeEmergencyEvent(
+    @Param("id") id: string,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.acknowledgeEmergencyEvent(id, u.id);
+  }
+
+  @Patch("emergency-events/:id/resolve")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  resolveEmergencyEvent(
+    @Param("id") id: string,
+    @Body() dto: ResolveEmergencyEventDto,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.resolveEmergencyEvent(id, u.id, dto.resolution);
   }
 
   @Get("episodes/:id")
