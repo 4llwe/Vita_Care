@@ -5,6 +5,7 @@ export const JOB_NAMES = {
   notificationReconcile: 'notification-reconcile',
   capaDaily: 'capa-daily',
   hahAlertEscalation: 'hah-alert-escalation',
+  hahMedicationSchedule: 'hah-medication-schedule',
 } as const;
 
 export type JobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

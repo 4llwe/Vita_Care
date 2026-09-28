@@ -84,5 +84,13 @@
 - Evaluation and discharge actions are written to the audit trail, with role and episode access enforced by the API.
 - The episode workspace displays evaluation history and a live, human-readable discharge-readiness summary.
 
+## Phase 2.1 — medication schedules, reminders, and adherence
+- Extended medication orders with explicit dose schedules while preserving existing prescribing and administration records.
+- Planned doses are updated in place when administered, preventing duplicate records and retaining the scheduled-versus-actual timeline.
+- Added durable five-minute medication scheduling jobs for patient reminders and missed-dose detection.
+- Reminder and missed-dose claims are idempotent across horizontally scaled workers; missed doses create clinical notifications and audit records.
+- Added episode-level adherence calculations and patient/family views for scheduled, given, delayed, refused, omitted, and missed doses.
+- Medication adherence is presented as monitoring support and never as an automated diagnosis.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

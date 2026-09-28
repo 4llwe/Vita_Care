@@ -54,6 +54,17 @@ export function PatientClinicalSummary() {
     d.visits?.find((x: any) => x.handoverNote)?.handoverNote ??
     d.alerts?.find((x: any) => x.resolution)?.resolution ??
     "Belum ada pesan baru dari tenaga kesehatan.";
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(todayStart);
+  todayEnd.setDate(todayEnd.getDate() + 1);
+  const todayDoses = (d.medicationOrders ?? []).flatMap((order: any) =>
+    (order.administrations ?? []).filter((dose: any) => {
+      const scheduled = new Date(dose.scheduledAt);
+      return scheduled >= todayStart && scheduled < todayEnd;
+    }),
+  );
+  const givenToday = todayDoses.filter((dose: any) => dose.status === "GIVEN").length;
   return (
     <div className="space-y-5">
       <section className="flex flex-col gap-4 rounded-3xl bg-slate-950 p-6 text-white sm:flex-row sm:items-center sm:justify-between">
@@ -85,7 +96,9 @@ export function PatientClinicalSummary() {
           ],
           [
             "Obat hari ini",
-            `${d.medicationOrders?.filter((x: any) => x.status === "ACTIVE").length ?? 0} order aktif`,
+            todayDoses.length
+              ? `${givenToday}/${todayDoses.length} dosis tercatat`
+              : `${d.medicationOrders?.filter((x: any) => x.status === "ACTIVE").length ?? 0} order aktif`,
           ],
           [
             "Hasil laboratorium",

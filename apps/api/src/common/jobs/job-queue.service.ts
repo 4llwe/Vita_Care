@@ -47,6 +47,11 @@ export class JobQueueService implements OnModuleDestroy {
       { name: JOB_NAMES.hahAlertEscalation, data: {}, opts: deliveryOptions },
     );
     await this.queue.upsertJobScheduler(
+      'hah-medication-schedule-every-5m',
+      { every: 5 * 60_000 },
+      { name: JOB_NAMES.hahMedicationSchedule, data: {}, opts: deliveryOptions },
+    );
+    await this.queue.upsertJobScheduler(
       'capa-daily-asia-makassar',
       { pattern: '0 8 * * *', tz: 'Asia/Makassar' },
       { name: JOB_NAMES.capaDaily, data: {}, opts: deliveryOptions },

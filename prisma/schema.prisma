@@ -1021,13 +1021,17 @@ model MedicationAdministration {
   id                  String          @id @default(cuid())
   medicationOrderId   String
   medicationOrder     MedicationOrder @relation(fields: [medicationOrderId], references: [id], onDelete: Cascade)
-  administeredById    String
+  scheduledById       String
+  administeredById    String?
   scheduledAt         DateTime
   administeredAt      DateTime?
-  status              String
+  status              String          @default("PLANNED")
   note                String?
+  reminderSentAt      DateTime?
+  createdAt           DateTime        @default(now())
 
   @@index([medicationOrderId, scheduledAt])
+  @@index([status, scheduledAt])
 }
 
 model HaHTransfer {

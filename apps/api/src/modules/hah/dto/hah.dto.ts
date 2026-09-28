@@ -1,5 +1,6 @@
 import {
   ArrayMinSize,
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -141,6 +142,11 @@ export class CreateMedicationOrderDto {
   @IsString() @MinLength(3) indication!: string;
   @IsDateString() startAt!: string;
   @IsOptional() @IsDateString() endAt?: string;
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsDateString({}, { each: true })
+  scheduleAt?: string[];
 }
 
 export class AdministerMedicationDto {

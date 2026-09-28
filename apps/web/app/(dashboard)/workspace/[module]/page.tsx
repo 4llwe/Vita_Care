@@ -186,7 +186,39 @@ export default function WorkspacePage() {
         <div className="medical-card text-sm text-slate-500">Memuat data klinis…</div>
       )}
       {detail && medicationModules.has(module) && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-4">
+          {(() => {
+            const due = (detail.medicationOrders ?? []).flatMap((m: any) =>
+              (m.administrations ?? []).filter(
+                (a: any) => new Date(a.scheduledAt) <= new Date(),
+              ),
+            );
+            const given = due.filter((a: any) => a.status === "GIVEN").length;
+            const percent = due.length
+              ? Math.round((given / due.length) * 100)
+              : null;
+            return (
+              <Card title="Kepatuhan obat">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <p className="text-3xl font-black text-teal-800">
+                      {percent === null ? "—" : `${percent}%`}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      {given} dari {due.length} dosis terjadwal telah tercatat
+                      diberikan.
+                    </p>
+                  </div>
+                  <p className="max-w-md text-xs leading-5 text-slate-500">
+                    Status ini membantu pemantauan dan bukan dasar diagnosis.
+                    Hubungi tenaga kesehatan bila dosis terlewat atau muncul efek
+                    yang tidak diharapkan.
+                  </p>
+                </div>
+              </Card>
+            );
+          })()}
+          <div className="grid gap-4 lg:grid-cols-2">
           {(detail.medicationOrders ?? []).length ? (
             detail.medicationOrders.map((m: any) => (
               <Card key={m.id} title={m.medicationName}>
@@ -202,6 +234,26 @@ export default function WorkspacePage() {
                   <dt>Pemberian tercatat</dt>
                   <dd className="font-bold">{m.administrations?.length ?? 0}</dd>
                 </dl>
+                <div className="mt-4 space-y-2">
+                  {(m.administrations ?? [])
+                    .slice()
+                    .sort(
+                      (a: any, b: any) =>
+                        new Date(a.scheduledAt).getTime() -
+                        new Date(b.scheduledAt).getTime(),
+                    )
+                    .map((a: any) => (
+                      <div
+                        key={a.id}
+                        className="flex justify-between gap-3 rounded-lg bg-slate-50 p-2 text-xs"
+                      >
+                        <span>
+                          {new Date(a.scheduledAt).toLocaleString("id-ID")}
+                        </span>
+                        <b>{a.status}</b>
+                      </div>
+                    ))}
+                </div>
               </Card>
             ))
           ) : (
@@ -209,6 +261,7 @@ export default function WorkspacePage() {
               <Empty>Order obat dibuat oleh dokter pada workspace episode.</Empty>
             </Card>
           )}
+          </div>
         </div>
       )}
       {detail && diagnosticModules.has(module) && (

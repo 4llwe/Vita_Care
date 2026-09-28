@@ -46,6 +46,9 @@ export class JobWorkerService implements OnApplicationBootstrap, OnModuleDestroy
     if (job.name === JOB_NAMES.hahAlertEscalation) {
       return this.hah.escalateOverdueAlerts();
     }
+    if (job.name === JOB_NAMES.hahMedicationSchedule) {
+      return this.hah.processMedicationSchedules();
+    }
     throw new Error(`Jenis job tidak dikenal: ${job.name}`);
   }
 

@@ -63,3 +63,94 @@ describe("HaHService discharge safety", () => {
     expect(prisma.haHEpisode.update).toBeUndefined();
   });
 });
+
+describe("HaHService medication adherence", () => {
+  it("memperbarui dosis terjadwal tanpa membuat catatan duplikat", async () => {
+    const planned = {
+      id: "dose-1",
+      medicationOrderId: "med-1",
+      scheduledAt: new Date("2026-09-29T08:00:00Z"),
+      status: "PLANNED",
+    };
+    const prisma: any = {
+      medicationOrder: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "med-1",
+          episodeId: "episode-1",
+          status: "ACTIVE",
+        }),
+      },
+      medicationAdministration: {
+        findFirst: jest.fn().mockResolvedValue(planned),
+        update: jest.fn().mockResolvedValue({ ...planned, status: "GIVEN" }),
+        create: jest.fn(),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const service = new HaHService(prisma, {} as any);
+
+    await service.administerMedication(
+      "med-1",
+      {
+        scheduledAt: "2026-09-29T08:00:00Z",
+        administeredAt: "2026-09-29T08:02:00Z",
+        status: "GIVEN",
+      },
+      "nurse-1",
+    );
+
+    expect(prisma.medicationAdministration.update).toHaveBeenCalled();
+    expect(prisma.medicationAdministration.create).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("mengklaim reminder dan menandai dosis terlambat secara idempoten", async () => {
+    const episode = {
+      id: "episode-1",
+      code: "HAH-1",
+      patient: { fullName: "Pasien Uji", portalUserId: "patient-1" },
+    };
+    const order = {
+      id: "med-1",
+      episodeId: "episode-1",
+      medicationName: "Obat Uji",
+      dose: "1 tablet",
+      episode,
+    };
+    const reminder = {
+      id: "dose-reminder",
+      medicationOrderId: "med-1",
+      scheduledAt: new Date("2026-09-29T08:20:00Z"),
+      medicationOrder: order,
+    };
+    const overdue = {
+      ...reminder,
+      id: "dose-missed",
+      scheduledAt: new Date("2026-09-29T06:00:00Z"),
+    };
+    const prisma: any = {
+      medicationAdministration: {
+        findMany: jest
+          .fn()
+          .mockResolvedValueOnce([reminder])
+          .mockResolvedValueOnce([overdue]),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const notify = {
+      enqueue: jest.fn().mockResolvedValue({}),
+      enqueueClinical: jest.fn().mockResolvedValue([]),
+    };
+
+    const result = await new HaHService(prisma, notify as any).processMedicationSchedules(
+      new Date("2026-09-29T08:00:00Z"),
+    );
+
+    expect(result).toEqual({ reminded: 1, missed: 1 });
+    expect(notify.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "patient-1", title: "Pengingat obat" }),
+    );
+    expect(notify.enqueueClinical).toHaveBeenCalled();
+  });
+});
