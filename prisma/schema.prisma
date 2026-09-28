@@ -23,6 +23,12 @@ enum Role {
   CAREGIVER
 }
 
+enum CareAssignmentType {
+  PRIMARY_CLINICIAN
+  VISIT
+  CARE_COORDINATOR
+}
+
 enum BookingStatus {
   DIPESAN
   DIKONFIRMASI
@@ -114,6 +120,7 @@ model User {
   protocolApprovals HaHClinicalProtocolApproval[] @relation("ProtocolApprover")
   breakGlassAccesses HaHBreakGlassAccess[] @relation("BreakGlassUser")
   patientBookings Booking[] @relation("BookingPatientAccount")
+  patientProfile Patient? @relation("PatientAccount")
   authSessions AuthSession[]
   authSecurityEvents AuthSecurityEvent[]
   roleAssignments UserRole[]
@@ -194,6 +201,7 @@ model Service {
   isActive  Boolean  @default(true)
   tariffs   Tariff[]
   bookings  Booking[]
+  appointments Appointment[]
 }
 
 model Tariff {
@@ -217,6 +225,7 @@ model HealthWorker {
   isActive         Boolean  @default(true)
   bookings         Booking[]
   hahVisits         HaHVisit[]
+  careAssignments  CareAssignment[]
 }
 
 model Booking {
@@ -243,9 +252,68 @@ model Booking {
   record         MedicalRecord?
   invoice        Invoice?
   referrals      Referral[]
+  appointment    Appointment?
 
   @@index([patientUserId, scheduledAt])
   @@index([healthWorkerId, scheduledAt])
+}
+
+model Patient {
+  id           String       @id @default(cuid())
+  userId       String?      @unique
+  user         User?        @relation("PatientAccount", fields: [userId], references: [id], onDelete: SetNull)
+  mrn          String       @unique
+  nationalId   String?      @unique
+  fullName     String
+  phone        String?
+  dateOfBirth  DateTime?
+  sexAtBirth   String?
+  address      String?
+  zone         String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  appointments Appointment[]
+  hahProfile   HaHPatient?
+
+  @@index([fullName])
+}
+
+model Appointment {
+  id              String           @id @default(cuid())
+  bookingId       String?          @unique
+  booking         Booking?         @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  patientId       String
+  patient         Patient          @relation(fields: [patientId], references: [id])
+  serviceId       String
+  service         Service          @relation(fields: [serviceId], references: [id])
+  scheduledAt     DateTime
+  status          BookingStatus    @default(DIPESAN)
+  zone            String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  careAssignments CareAssignment[]
+
+  @@index([patientId, scheduledAt])
+  @@index([serviceId, scheduledAt])
+}
+
+model CareAssignment {
+  id             String             @id @default(cuid())
+  appointmentId  String?
+  appointment    Appointment?       @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  episodeId      String?
+  episode        HaHEpisode?        @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  healthWorkerId String
+  healthWorker   HealthWorker       @relation(fields: [healthWorkerId], references: [id])
+  type           CareAssignmentType
+  startsAt       DateTime
+  endsAt         DateTime?
+  isActive       Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+
+  @@unique([appointmentId, healthWorkerId, type])
+  @@unique([episodeId, healthWorkerId, type])
+  @@index([healthWorkerId, isActive, startsAt])
 }
 
 model MedicalRecord {
@@ -599,6 +667,8 @@ enum EquipmentAssignmentStatus {
 
 model HaHPatient {
   id                 String       @id @default(cuid())
+  canonicalPatientId String?      @unique
+  canonicalPatient   Patient?     @relation(fields: [canonicalPatientId], references: [id], onDelete: SetNull)
   mrn                String       @unique
   portalUserId       String?      @unique
   nationalId         String?      @unique
@@ -656,6 +726,7 @@ model HaHEpisode {
   carePlanRevisions      HaHCarePlanRevision[]
   messages               HaHClinicalMessage[]
   breakGlassAccesses     HaHBreakGlassAccess[]
+  careAssignments       CareAssignment[]
 
   @@index([status, createdAt])
   @@index([patientId, createdAt])

@@ -21,4 +21,50 @@ describe('BookingService', () => {
     const svc = new BookingService(prisma, {} as any);
     expect(await svc.generateCode()).toMatch(/^BK-2041$/);
   });
+
+  it('dual-writes self booking into canonical patient and appointment', async () => {
+    const tx: any = {
+      patient: {
+        upsert: jest.fn().mockResolvedValue({ id: 'patient-1' }),
+      },
+      booking: {
+        create: jest.fn().mockResolvedValue({
+          id: 'booking-1',
+          scheduledAt: new Date('2026-10-01T08:00:00Z'),
+        }),
+      },
+      appointment: {
+        create: jest.fn().mockResolvedValue({ id: 'appointment-1' }),
+      },
+    };
+    const prisma: any = {
+      booking: { count: jest.fn().mockResolvedValue(0) },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'user-1',
+          name: 'Patient One',
+          phone: '0800000000',
+        }),
+      },
+      $transaction: jest.fn((callback) => callback(tx)),
+    };
+    const svc = new BookingService(prisma, {} as any);
+
+    await svc.createForPatient({
+      serviceId: 'service-1',
+      zone: 'Mataram',
+      scheduledAt: '2026-10-01T08:00:00Z',
+    }, 'user-1');
+
+    expect(tx.patient.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 'user-1' } }),
+    );
+    expect(tx.appointment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        bookingId: 'booking-1',
+        patientId: 'patient-1',
+        serviceId: 'service-1',
+      }),
+    });
+  });
 });

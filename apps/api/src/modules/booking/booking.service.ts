@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { BookingStatus } from '@prisma/client';
+import { BookingStatus, CareAssignmentType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from '../../common/auth/actor';
 import { GeoService } from './geo.service';
@@ -34,17 +34,38 @@ export class BookingService {
 
   async create(dto: CreateBookingDto) {
     const code = await this.generateCode();
-    return this.prisma.booking.create({
-      data: {
-        code,
-        patientName: dto.patientName,
-        serviceId: dto.serviceId,
-        zone: dto.zone,
-        addressLat: dto.lat,
-        addressLng: dto.lng,
-        scheduledAt: new Date(dto.scheduledAt),
-        status: BookingStatus.DIPESAN,
-      },
+    const scheduledAt = new Date(dto.scheduledAt);
+    return this.prisma.$transaction(async (tx) => {
+      const patient = await tx.patient.create({
+        data: {
+          mrn: `ANON-${code}`,
+          fullName: dto.patientName,
+          zone: dto.zone,
+        },
+      });
+      const booking = await tx.booking.create({
+        data: {
+          code,
+          patientName: dto.patientName,
+          serviceId: dto.serviceId,
+          zone: dto.zone,
+          addressLat: dto.lat,
+          addressLng: dto.lng,
+          scheduledAt,
+          status: BookingStatus.DIPESAN,
+        },
+      });
+      await tx.appointment.create({
+        data: {
+          bookingId: booking.id,
+          patientId: patient.id,
+          serviceId: dto.serviceId,
+          scheduledAt,
+          status: BookingStatus.DIPESAN,
+          zone: dto.zone,
+        },
+      });
+      return booking;
     });
   }
 
@@ -56,7 +77,14 @@ export class BookingService {
     if (!BOOKING_TRANSITIONS[bk.status].includes(next)) {
       throw new BadRequestException(`Transisi ${bk.status} -> ${next} tidak valid`);
     }
-    return this.prisma.booking.update({ where: { id }, data: { status: next } });
+    return this.prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.update({ where: { id }, data: { status: next } });
+      await tx.appointment.updateMany({
+        where: { bookingId: id },
+        data: { status: next },
+      });
+      return booking;
+    });
   }
 
   /** Assign manual ke nakes tertentu (validasi aktif, sezona, lisensi valid). */
@@ -75,10 +103,14 @@ export class BookingService {
     if (bk.status === BookingStatus.DIPESAN) {
       await this.changeStatus(bookingId, BookingStatus.DIKONFIRMASI).catch(() => undefined);
     }
-    return this.prisma.booking.update({
-      where: { id: bookingId },
-      data: { healthWorkerId: workerId, status: BookingStatus.DITUGASKAN },
-      include: { service: true, healthWorker: true },
+    return this.prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.update({
+        where: { id: bookingId },
+        data: { healthWorkerId: workerId, status: BookingStatus.DITUGASKAN },
+        include: { service: true, healthWorker: true },
+      });
+      await this.syncAppointmentAssignment(tx, bookingId, workerId, booking.scheduledAt);
+      return booking;
     });
   }
 
@@ -99,9 +131,13 @@ export class BookingService {
       ?? candidates[0];
 
     await this.changeStatus(bookingId, BookingStatus.DIKONFIRMASI).catch(() => undefined);
-    return this.prisma.booking.update({
-      where: { id: bookingId },
-      data: { healthWorkerId: best.id, status: BookingStatus.DITUGASKAN },
+    return this.prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.update({
+        where: { id: bookingId },
+        data: { healthWorkerId: best.id, status: BookingStatus.DITUGASKAN },
+      });
+      await this.syncAppointmentAssignment(tx, bookingId, best.id, booking.scheduledAt);
+      return booking;
     });
   }
 
@@ -118,20 +154,49 @@ export class BookingService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('Pengguna tidak ditemukan');
     const code = await this.generateCode();
-    return this.prisma.booking.create({
-      data: {
-        code,
-        patientName: user.name,
-        patientPhone: user.phone,
-        patientUserId: user.id,
-        serviceId: dto.serviceId,
-        zone: dto.zone,
-        addressLat: dto.lat,
-        addressLng: dto.lng,
-        scheduledAt: new Date(dto.scheduledAt),
-        status: BookingStatus.DIPESAN,
-      },
-      include: { service: true },
+    const scheduledAt = new Date(dto.scheduledAt);
+    return this.prisma.$transaction(async (tx) => {
+      const patient = await tx.patient.upsert({
+        where: { userId: user.id },
+        update: {
+          fullName: user.name,
+          phone: user.phone,
+          zone: dto.zone,
+        },
+        create: {
+          userId: user.id,
+          mrn: `USR-${user.id}`,
+          fullName: user.name,
+          phone: user.phone,
+          zone: dto.zone,
+        },
+      });
+      const booking = await tx.booking.create({
+        data: {
+          code,
+          patientName: user.name,
+          patientPhone: user.phone,
+          patientUserId: user.id,
+          serviceId: dto.serviceId,
+          zone: dto.zone,
+          addressLat: dto.lat,
+          addressLng: dto.lng,
+          scheduledAt,
+          status: BookingStatus.DIPESAN,
+        },
+        include: { service: true },
+      });
+      await tx.appointment.create({
+        data: {
+          bookingId: booking.id,
+          patientId: patient.id,
+          serviceId: dto.serviceId,
+          scheduledAt,
+          status: BookingStatus.DIPESAN,
+          zone: dto.zone,
+        },
+      });
+      return booking;
     });
   }
 
@@ -187,6 +252,44 @@ export class BookingService {
     if (!actor || !actorHasAnyRole(actor, CLINICAL_ROLES)) return;
     const assigned = healthWorkerId ? await this.prisma.healthWorker.findFirst({ where: { id: healthWorkerId, userId: actor.id, isActive: true }, select: { id: true } }) : null;
     if (!assigned) throw new BadRequestException("Booking tidak ditugaskan kepada Anda");
+  }
+
+  private async syncAppointmentAssignment(
+    tx: Prisma.TransactionClient,
+    bookingId: string,
+    healthWorkerId: string,
+    startsAt: Date,
+  ) {
+    const appointment = await tx.appointment.findUnique({
+      where: { bookingId },
+      select: { id: true },
+    });
+    if (!appointment) return;
+    await tx.careAssignment.updateMany({
+      where: {
+        appointmentId: appointment.id,
+        type: CareAssignmentType.VISIT,
+        healthWorkerId: { not: healthWorkerId },
+        isActive: true,
+      },
+      data: { isActive: false, endsAt: new Date() },
+    });
+    await tx.careAssignment.upsert({
+      where: {
+        appointmentId_healthWorkerId_type: {
+          appointmentId: appointment.id,
+          healthWorkerId,
+          type: CareAssignmentType.VISIT,
+        },
+      },
+      update: { isActive: true, startsAt, endsAt: null },
+      create: {
+        appointmentId: appointment.id,
+        healthWorkerId,
+        type: CareAssignmentType.VISIT,
+        startsAt,
+      },
+    });
   }
 
 }
