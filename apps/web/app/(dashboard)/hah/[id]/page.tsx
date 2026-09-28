@@ -694,7 +694,141 @@ export default function EpisodePage() {
                 </div>
               ))}
             </Panel>
+            <Panel title="Evaluasi klinis">
+              <p className="text-sm leading-6 text-slate-600">
+                Dokter menilai perkembangan terhadap target care plan. Status siap
+                discharge hanya dapat dipilih setelah alert dan pemeriksaan tertunda
+                diselesaikan.
+              </p>
+              <form
+                className="space-y-3"
+                onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  submit(`/hah/episodes/${id}/evaluations`, {
+                    clinicalSummary: f.get("clinicalSummary"),
+                    progressNotes: f.get("progressNotes"),
+                    goalsMet: String(f.get("goalsMet"))
+                      .split("\n")
+                      .filter(Boolean),
+                    unmetGoals: String(f.get("unmetGoals") || "")
+                      .split("\n")
+                      .filter(Boolean),
+                    disposition: f.get("disposition"),
+                    followUpRequired: f.get("followUpRequired") || undefined,
+                  });
+                }}
+              >
+                <Field label="Ringkasan klinis">
+                  <textarea
+                    name="clinicalSummary"
+                    minLength={20}
+                    required
+                    className={input}
+                  />
+                </Field>
+                <Field label="Perkembangan pasien">
+                  <textarea
+                    name="progressNotes"
+                    minLength={20}
+                    required
+                    className={input}
+                  />
+                </Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Target tercapai (satu per baris)">
+                    <textarea name="goalsMet" required className={input} />
+                  </Field>
+                  <Field label="Target belum tercapai">
+                    <textarea name="unmetGoals" className={input} />
+                  </Field>
+                </div>
+                <Field label="Keputusan evaluasi">
+                  <select name="disposition" className={input}>
+                    <option value="CONTINUE_CARE">Lanjutkan perawatan</option>
+                    <option value="MODIFY_CARE_PLAN">Ubah rencana perawatan</option>
+                    <option value="DISCHARGE_READY">Siap discharge</option>
+                    <option value="TRANSFER_RECOMMENDED">Rekomendasikan transfer</option>
+                  </select>
+                </Field>
+                <Field label="Tindak lanjut">
+                  <textarea name="followUpRequired" className={input} />
+                </Field>
+                <button className={btn} disabled={busy}>
+                  Simpan evaluasi
+                </button>
+              </form>
+              {d.clinicalEvaluations?.length ? (
+                <div className="space-y-2 border-t pt-4">
+                  <h3 className="font-bold text-slate-900">Riwayat evaluasi</h3>
+                  {d.clinicalEvaluations.map((evaluation: any) => (
+                    <article
+                      key={evaluation.id}
+                      className="rounded-lg border border-slate-200 p-3 text-sm"
+                    >
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <strong>{evaluation.disposition.replaceAll("_", " ")}</strong>
+                        <time className="text-slate-500">
+                          {new Date(evaluation.evaluatedAt).toLocaleString("id-ID")}
+                        </time>
+                      </div>
+                      <p className="mt-2 text-slate-700">
+                        {evaluation.clinicalSummary}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-lg bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+                  Belum ada evaluasi klinis.
+                </p>
+              )}
+            </Panel>
             <Panel title="Transfer / discharge">
+              {(() => {
+                const openAlerts =
+                  d.alerts?.filter((x: any) => x.status !== "RESOLVED").length ?? 0;
+                const pendingDiagnostics =
+                  d.diagnosticOrders?.filter((x: any) =>
+                    ["ORDERED", "COLLECTED", "PROCESSING"].includes(x.status),
+                  ).length ?? 0;
+                const criticalResults =
+                  d.diagnosticOrders?.filter(
+                    (x: any) => x.criticalResult && !x.acknowledgedAt,
+                  ).length ?? 0;
+                const latest = d.clinicalEvaluations?.[0];
+                const evaluationCurrent =
+                  latest?.disposition === "DISCHARGE_READY" &&
+                  (!d.carePlan ||
+                    new Date(latest.evaluatedAt) >= new Date(d.carePlan.updatedAt));
+                const ready =
+                  !openAlerts &&
+                  !pendingDiagnostics &&
+                  !criticalResults &&
+                  evaluationCurrent;
+                return (
+                  <aside
+                    className={`rounded-lg p-3 text-sm font-semibold ${
+                      ready
+                        ? "bg-emerald-50 text-emerald-900"
+                        : "bg-amber-50 text-amber-950"
+                    }`}
+                  >
+                    {ready
+                      ? "Siap discharge berdasarkan evaluasi dan pemeriksaan keselamatan terbaru."
+                      : `Belum siap discharge: ${[
+                          openAlerts && `${openAlerts} alert terbuka`,
+                          pendingDiagnostics &&
+                            `${pendingDiagnostics} diagnostik berjalan`,
+                          criticalResults &&
+                            `${criticalResults} hasil kritis belum diakui`,
+                          !evaluationCurrent && "evaluasi DISCHARGE_READY belum berlaku",
+                        ]
+                          .filter(Boolean)
+                          .join("; ")}.`}
+                  </aside>
+                );
+              })()}
               <form
                 className="space-y-3"
                 onSubmit={(e: FormEvent<HTMLFormElement>) => {

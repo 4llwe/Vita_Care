@@ -122,6 +122,7 @@ export class HaHAccessGuard implements CanActivate {
         "eligibility",
         "admit",
         "care-plan",
+        "evaluations",
         "alerts/:id/resolve",
         "discharge",
         "diagnostics",
