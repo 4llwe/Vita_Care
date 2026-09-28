@@ -37,10 +37,11 @@ export function validateEnvironment() {
     "EMAIL_API_URL",
     "EMAIL_API_TOKEN",
     "EMAIL_CLINICAL_TO",
-    "REDIS_PASSWORD",
     "BACKUP_ENCRYPTION_KEY",
   ])
     required(key);
+  if (!process.env.REDIS_URL?.trim() && !process.env.REDIS_PASSWORD?.trim())
+    throw new Error("REDIS_URL atau REDIS_PASSWORD wajib di produksi");
   if ((process.env.S3_SECRET_KEY ?? "").length < 16)
     throw new Error("S3_SECRET_KEY terlalu pendek");
   if ((process.env.BACKUP_ENCRYPTION_KEY ?? "").length < 32)

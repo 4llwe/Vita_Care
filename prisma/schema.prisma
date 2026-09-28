@@ -1046,9 +1046,11 @@ model NotificationDelivery {
   providerId String?
   lastError String?
   deliveredAt DateTime?
+  lockedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([status, nextAttemptAt])
+  @@index([status, lockedAt])
 }
 
 model HaHClinicalProtocolApproval {

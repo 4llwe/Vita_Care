@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { CapaStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationService } from '../notification/notification.service';
@@ -52,7 +51,6 @@ export class CapaService {
    * Cron harian 08:00: ingatkan CAPA yang mendekati deadline (<=3 hari)
    * dan eskalasi CAPA yang terlambat ke atasan.
    */
-  @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: 'Asia/Makassar' })
   async runDailyReminders() {
     const now = new Date();
     const soon = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
@@ -62,7 +60,7 @@ export class CapaService {
       include: { pic: true, finding: true },
     });
     for (const c of dueSoon) {
-      await this.notify.send({
+      await this.notify.enqueue({
         to: c.pic?.id,
         channel: 'in-app',
         title: 'Pengingat CAPA',
@@ -76,7 +74,7 @@ export class CapaService {
     });
     for (const c of overdue) {
       await this.prisma.capa.update({ where: { id: c.id }, data: { status: CapaStatus.OVERDUE, escalated: true } });
-      await this.notify.send({
+      await this.notify.enqueue({
         channel: 'email',
         title: 'Eskalasi CAPA Terlambat',
         body: `CAPA temuan ${c.finding.code} TERLAMBAT dan dieskalasi ke manajemen.`,

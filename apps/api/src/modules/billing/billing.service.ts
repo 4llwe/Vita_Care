@@ -110,7 +110,7 @@ export class BillingService {
     });
 
     if (mapped === 'PAID') {
-      await this.notify.send({
+      await this.notify.enqueue({
         channel: 'whatsapp',
         title: 'Pembayaran Diterima',
         body: `Invoice ${invoice.code} telah LUNAS. Terima kasih.`,

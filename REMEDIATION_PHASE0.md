@@ -44,6 +44,11 @@
 - PostgreSQL RLS policies protect documents, versions, and grants using transaction-scoped actor context.
 - Document ownership, version authorship, and review identity are derived from the authenticated actor.
 
+## Phase 1.5 — durable jobs and safe schedulers
+- Added a Redis-backed BullMQ queue with a dedicated worker process.
+- Notification deliveries use deterministic job IDs, exponential retry, database leases, and stale-job recovery.
+- CAPA reminders and queue reconciliation use Redis job schedulers, so multiple worker replicas do not duplicate schedules.
+- API instances only produce jobs; horizontally scaled workers coordinate processing through Redis locks.
+
 ## Still pending for Phase 1+
-- Redis-backed durable jobs and horizontally safe schedulers.
 - Full public website information architecture and operator-approved service catalogue.
