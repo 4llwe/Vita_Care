@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
-import { Interval } from "@nestjs/schedule";
 import {
   Prisma,
   ClinicalAlertSeverity,
@@ -558,7 +557,7 @@ export class HaHService {
         data: { episodeId: id, ...dto, requestedById: actorId },
       }),
     ]);
-    await this.notify.send({
+    await this.notify.enqueue({
       channel: "in-app",
       title: `Transfer ${dto.urgency}`,
       body: `${e.code} ke ${dto.destination}: ${dto.reason}`,
@@ -643,7 +642,7 @@ export class HaHService {
           responseDueAt: new Date(Date.now() + 15 * 60_000),
         },
       });
-      await this.notify.send({
+      await this.notify.enqueue({
         channel: "in-app",
         title: "Critical diagnostic result",
         body: `${order.episode.code}: ${order.testName}`,
@@ -981,7 +980,6 @@ export class HaHService {
     });
   }
 
-  @Interval(60_000)
   async escalateOverdueAlerts() {
     const alerts = await this.prisma.clinicalAlert.findMany({
       where: {

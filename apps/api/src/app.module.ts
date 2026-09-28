@@ -1,7 +1,6 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { AuditTrailInterceptor } from "./common/interceptors/audit-trail.interceptor";
-import { ScheduleModule } from "@nestjs/schedule";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { PrismaService } from "./common/prisma/prisma.service";
 import { AuthModule } from "./modules/auth/auth.module";
@@ -22,10 +21,11 @@ import { NotificationModule } from "./modules/notification/notification.module";
 import { HaHModule } from "./modules/hah/hah.module";
 import { PublicRequestModule } from "./modules/public-request/public-request.module";
 import { MenuModule } from "./modules/menu/menu.module";
+import { JobQueueModule } from "./common/jobs/job-queue.module";
 
 @Module({
   imports: [
-    ScheduleModule.forRoot(),
+    JobQueueModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     NotificationModule,
     HaHModule,

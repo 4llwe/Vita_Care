@@ -25,7 +25,9 @@ cp .env.example .env
 | `API_URL` / `NEXT_PUBLIC_API_URL` | ✅ | URL API yang diakses browser |
 | `S3_ENDPOINT` `S3_BUCKET` `S3_REGION` `S3_ACCESS_KEY` `S3_SECRET_KEY` | ⭐ | isi untuk S3/MinIO; bila kosong fallback ke `STORAGE_DIR` lokal |
 | `MIDTRANS_SERVER_KEY` / `MIDTRANS_CLIENT_KEY` | ✅ untuk billing | Transaksi ditolak bila provider belum dikonfigurasi |
-| `WHATSAPP_*` `SMTP_*` | ⭐ | notifikasi rujukan darurat & email |
+| `WHATSAPP_*` `EMAIL_*` | ⭐ | notifikasi rujukan darurat & email |
+| `REDIS_URL` atau `REDIS_HOST`/`REDIS_PASSWORD` | ✅ | antrean BullMQ dan scheduler terdistribusi |
+| `JOB_CONCURRENCY` | ⭐ | konkurensi worker; default `10` |
 
 > Seed tidak membuat akun demo. Isi `SEED_ADMIN_EMAIL` dan `SEED_ADMIN_PASSWORD` (minimal 12 karakter) melalui secret manager sebelum menjalankan seed.
 
@@ -61,14 +63,14 @@ S3_BUCKET=vitacare-evidence S3_REGION=ap-southeast-1 bash infra/setup-s3-cors.sh
 docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 ```
 
-Layanan: `db` (internal), `redis` (internal), `minio` (opsional), `api` (:3001), `web` (:3000).
+Layanan: `db` (internal), `redis` (internal), `worker` (BullMQ), `api` (:3001), dan `web` (:3000). Worker wajib selalu aktif; jangan menjalankan scheduler di proses API.
 Taruh reverse proxy (Nginx/Caddy/Traefik) di depan untuk TLS & routing domain.
 
 ## 6. Health check & smoke test
 
 ```bash
 curl -fsS http://localhost:3001/api/health        # {"status":"ok"}
-curl -fsS http://localhost:3001/api/health/ready  # {"status":"ready","db":"up"}
+curl -fsS http://localhost:3001/api/health/ready  # {"status":"ready","db":"up","redis":"up"}
 ```
 
 Jalankan e2e terhadap lingkungan staging:
@@ -102,7 +104,7 @@ server {
 - [ ] TLS aktif (HTTPS) di web & api; HSTS via reverse proxy.
 - [ ] `helmet`, rate limit (`ThrottlerModule`), dan validasi input aktif (default sudah ON).
 - [ ] Health check `/api/health` & `/api/health/ready` 200.
-- [ ] Cron CAPA (pengingat & eskalasi) berjalan (cek log).
+- [ ] Worker BullMQ aktif; scheduler CAPA, rekonsiliasi notifikasi, dan eskalasi klinis terdaftar satu kali di Redis.
 - [ ] Midtrans webhook URL terdaftar & signature terverifikasi (bila pembayaran live).
 - [ ] Notifikasi WhatsApp/SMTP rujukan darurat teruji.
 - [ ] e2e Playwright hijau di staging.

@@ -45,7 +45,7 @@ export class ReferralService {
     });
 
     if (referral.urgency === ReferralUrgency.EMERGENCY) {
-      await this.notify.send({
+      await this.notify.enqueue({
         channel: 'whatsapp',
         title: 'Rujukan DARURAT',
         body: `Rujukan ${referral.code} (${referral.patientName}) ke ${referral.toHospital} berstatus DARURAT. Mohon segera ditindaklanjuti.`,
