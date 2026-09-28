@@ -32,8 +32,13 @@
 - JWT validation and role guards resolve effective roles from the database on every authenticated request.
 - Clinical object-level assignment checks continue to apply to Doctor and Nurse access.
 
+## Phase 1.3 — canonical care schema
+- Added canonical `Patient`, `Appointment`, and `CareAssignment` models.
+- Backfilled legacy Booking and Hospital-at-Home identities and assignments.
+- Booking and HaH creation paths dual-write canonical records while legacy fields remain available.
+- Added a database constraint requiring each care assignment to target exactly one appointment or HaH episode.
+
 ## Still pending for Phase 1+
-- Canonical patient/appointment/assignment schema.
 - PostgreSQL RLS and object-level document authorization.
 - Redis-backed durable jobs and horizontally safe schedulers.
 - Full public website information architecture and operator-approved service catalogue.

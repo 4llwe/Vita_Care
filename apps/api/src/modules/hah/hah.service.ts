@@ -4,6 +4,7 @@ import {
   Prisma,
   ClinicalAlertSeverity,
   ClinicalAlertStatus,
+  CareAssignmentType,
   DiagnosticOrderStatus,
   EquipmentAssignmentStatus,
   HaHEligibilityDecision,
@@ -208,21 +209,58 @@ export class HaHService {
   }
 
   async createPatient(dto: CreatePatientDto) {
-    return this.prisma.haHPatient.create({
-      data: {
-        mrn: await this.nextCode("MRN", "patient"),
-        fullName: dto.fullName,
-        dateOfBirth: new Date(dto.dateOfBirth),
-        sexAtBirth: dto.sexAtBirth,
-        nationalId: dto.nationalId,
-        portalUserId: dto.portalUserId,
-        phone: dto.phone,
-        address: dto.address,
-        zone: dto.zone,
-        emergencyContactName: dto.emergencyContactName,
-        emergencyContactPhone: dto.emergencyContactPhone,
-        allergies: dto.allergies ?? [],
-      },
+    const mrn = await this.nextCode("MRN", "patient");
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.patient.findFirst({
+        where: {
+          OR: [
+            ...(dto.portalUserId ? [{ userId: dto.portalUserId }] : []),
+            ...(dto.nationalId ? [{ nationalId: dto.nationalId }] : []),
+          ],
+        },
+      });
+      const canonical = existing
+        ? await tx.patient.update({
+            where: { id: existing.id },
+            data: {
+              fullName: dto.fullName,
+              phone: dto.phone,
+              dateOfBirth: new Date(dto.dateOfBirth),
+              sexAtBirth: dto.sexAtBirth,
+              address: dto.address,
+              zone: dto.zone,
+            },
+          })
+        : await tx.patient.create({
+            data: {
+              userId: dto.portalUserId,
+              mrn,
+              nationalId: dto.nationalId,
+              fullName: dto.fullName,
+              phone: dto.phone,
+              dateOfBirth: new Date(dto.dateOfBirth),
+              sexAtBirth: dto.sexAtBirth,
+              address: dto.address,
+              zone: dto.zone,
+            },
+          });
+      return tx.haHPatient.create({
+        data: {
+          canonicalPatientId: canonical.id,
+          mrn,
+          fullName: dto.fullName,
+          dateOfBirth: new Date(dto.dateOfBirth),
+          sexAtBirth: dto.sexAtBirth,
+          nationalId: dto.nationalId,
+          portalUserId: dto.portalUserId,
+          phone: dto.phone,
+          address: dto.address,
+          zone: dto.zone,
+          emergencyContactName: dto.emergencyContactName,
+          emergencyContactPhone: dto.emergencyContactPhone,
+          allergies: dto.allergies ?? [],
+        },
+      });
     });
   }
 
@@ -246,6 +284,10 @@ export class HaHService {
     });
     if (active)
       throw new BadRequestException(`Pasien masih memiliki episode aktif ${active.code}`);
+    const physician = await this.prisma.healthWorker.findUnique({
+      where: { userId: dto.attendingPhysicianId },
+      select: { id: true },
+    });
     return this.prisma.haHEpisode.create({
       data: {
         code: await this.nextCode("HAH", "episode"),
@@ -262,6 +304,15 @@ export class HaHService {
         caregiverName: dto.caregiverName,
         caregiverPhone: dto.caregiverPhone,
         createdById: actorId,
+        careAssignments: physician
+          ? {
+              create: {
+                healthWorkerId: physician.id,
+                type: CareAssignmentType.PRIMARY_CLINICIAN,
+                startsAt: new Date(),
+              },
+            }
+          : undefined,
       },
       include: { patient: true },
     });
