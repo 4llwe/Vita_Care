@@ -83,6 +83,21 @@ export class CarePlanDto {
   @IsDateString() nextReviewAt!: string;
 }
 
+export class CreateClinicalEvaluationDto {
+  @IsString() @MinLength(20) clinicalSummary!: string;
+  @IsString() @MinLength(20) progressNotes!: string;
+  @IsArray() @ArrayMinSize(1) goalsMet!: string[];
+  @IsOptional() @IsArray() unmetGoals?: string[];
+  @IsIn([
+    "CONTINUE_CARE",
+    "MODIFY_CARE_PLAN",
+    "DISCHARGE_READY",
+    "TRANSFER_RECOMMENDED",
+  ])
+  disposition!: string;
+  @IsOptional() @IsString() followUpRequired?: string;
+}
+
 export class RecordObservationDto {
   @IsInt() @Min(40) @Max(300) systolic!: number;
   @IsInt() @Min(20) @Max(200) diastolic!: number;

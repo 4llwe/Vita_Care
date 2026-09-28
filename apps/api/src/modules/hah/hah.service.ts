@@ -6,6 +6,7 @@ import {
   CareAssignmentType,
   DiagnosticOrderStatus,
   EquipmentAssignmentStatus,
+  HaHEvaluationDisposition,
   HaHEligibilityDecision,
   HaHEpisodeStatus,
   HaHVisitStatus,
@@ -21,6 +22,7 @@ import {
   AdmitEpisodeDto,
   AssessEligibilityDto,
   CarePlanDto,
+  CreateClinicalEvaluationDto,
   CreateClinicalProtocolDto,
   CreateDiagnosticOrderDto,
   CreateEquipmentAssignmentDto,
@@ -60,6 +62,23 @@ export class HaHService {
         data: { alertId: entityId, type: action, actorId },
       }),
     ]);
+  }
+
+  private async auditEpisodeEvent(
+    actorId: string,
+    action: string,
+    episodeId: string,
+    after?: Prisma.InputJsonValue,
+  ) {
+    await this.prisma.auditLog.create({
+      data: {
+        actorId,
+        action,
+        entity: "HaHEpisode",
+        entityId: episodeId,
+        after,
+      },
+    });
   }
 
   async activeProtocol() {
@@ -457,6 +476,94 @@ export class HaHService {
     return plan;
   }
 
+  async createClinicalEvaluation(
+    id: string,
+    dto: CreateClinicalEvaluationDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(id);
+    if (
+      !(
+        [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException("Evaluasi memerlukan episode admitted/active");
+    const carePlan = await this.prisma.haHCarePlan.findUnique({
+      where: { episodeId: id },
+      select: { id: true },
+    });
+    if (!carePlan)
+      throw new BadRequestException("Rencana perawatan harus tersedia sebelum evaluasi");
+    if (dto.disposition === HaHEvaluationDisposition.DISCHARGE_READY) {
+      const readiness = await this.dischargeReadiness(id);
+      if (!readiness.ready)
+        throw new BadRequestException(
+          `Belum siap discharge: ${readiness.blockers.join("; ")}`,
+        );
+    }
+    const evaluation = await this.prisma.haHClinicalEvaluation.create({
+      data: {
+        episodeId: id,
+        clinicalSummary: dto.clinicalSummary,
+        progressNotes: dto.progressNotes,
+        goalsMet: dto.goalsMet,
+        unmetGoals: dto.unmetGoals ?? [],
+        disposition: dto.disposition as HaHEvaluationDisposition,
+        followUpRequired: dto.followUpRequired,
+        evaluatedById: actorId,
+      },
+    });
+    await this.auditEpisodeEvent(actorId, "CLINICAL_EVALUATION_CREATED", id, {
+      evaluationId: evaluation.id,
+      disposition: evaluation.disposition,
+    });
+    return evaluation;
+  }
+
+  async dischargeReadiness(id: string) {
+    await this.requireEpisode(id);
+    const [openAlerts, pendingDiagnostics, unacknowledgedCriticalResults] =
+      await Promise.all([
+        this.prisma.clinicalAlert.count({
+          where: { episodeId: id, status: { not: ClinicalAlertStatus.RESOLVED } },
+        }),
+        this.prisma.haHDiagnosticOrder.count({
+          where: {
+            episodeId: id,
+            status: {
+              in: [
+                DiagnosticOrderStatus.ORDERED,
+                DiagnosticOrderStatus.COLLECTED,
+                DiagnosticOrderStatus.PROCESSING,
+              ],
+            },
+          },
+        }),
+        this.prisma.haHDiagnosticOrder.count({
+          where: {
+            episodeId: id,
+            criticalResult: true,
+            acknowledgedAt: null,
+          },
+        }),
+      ]);
+    const blockers: string[] = [];
+    if (openAlerts) blockers.push(`${openAlerts} alert klinis belum selesai`);
+    if (pendingDiagnostics)
+      blockers.push(`${pendingDiagnostics} pemeriksaan diagnostik masih berjalan`);
+    if (unacknowledgedCriticalResults)
+      blockers.push(
+        `${unacknowledgedCriticalResults} hasil kritis belum diakui dokter`,
+      );
+    return {
+      ready: blockers.length === 0,
+      blockers,
+      openAlerts,
+      pendingDiagnostics,
+      unacknowledgedCriticalResults,
+    };
+  }
+
   async recordObservation(id: string, dto: RecordObservationDto, actorId: string) {
     const e = await this.requireEpisode(id);
     if (!([HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]).includes(e.status))
@@ -583,18 +690,33 @@ export class HaHService {
     return completed;
   }
 
-  async discharge(id: string, dto: DischargeDto) {
+  async discharge(id: string, dto: DischargeDto, actorId: string) {
     const e = await this.requireEpisode(id);
-    const openAlerts = await this.prisma.clinicalAlert.count({
-      where: { episodeId: id, status: { not: ClinicalAlertStatus.RESOLVED } },
-    });
-    if (openAlerts)
+    const readiness = await this.dischargeReadiness(id);
+    if (!readiness.ready)
       throw new BadRequestException(
-        `Selesaikan ${openAlerts} alert klinis sebelum discharge`,
+        `Belum siap discharge: ${readiness.blockers.join("; ")}`,
       );
     if (!([HaHEpisodeStatus.ACTIVE, HaHEpisodeStatus.TRANSFERRED] as HaHEpisodeStatus[]).includes(e.status))
       throw new BadRequestException("Episode belum dapat didischarge");
-    return this.prisma.haHEpisode.update({
+    if (e.status === HaHEpisodeStatus.ACTIVE) {
+      const [evaluation, carePlan] = await Promise.all([
+        this.prisma.haHClinicalEvaluation.findFirst({
+          where: { episodeId: id },
+          orderBy: { evaluatedAt: "desc" },
+        }),
+        this.prisma.haHCarePlan.findUnique({ where: { episodeId: id } }),
+      ]);
+      if (
+        !evaluation ||
+        evaluation.disposition !== HaHEvaluationDisposition.DISCHARGE_READY ||
+        (carePlan && evaluation.evaluatedAt < carePlan.updatedAt)
+      )
+        throw new BadRequestException(
+          "Evaluasi dokter DISCHARGE_READY terbaru diperlukan setelah perubahan care plan terakhir",
+        );
+    }
+    const discharged = await this.prisma.haHEpisode.update({
       where: { id },
       data: {
         status: HaHEpisodeStatus.DISCHARGED,
@@ -603,6 +725,10 @@ export class HaHService {
         dischargeSummary: dto.dischargeSummary,
       },
     });
+    await this.auditEpisodeEvent(actorId, "EPISODE_DISCHARGED", id, {
+      disposition: dto.dischargeDisposition,
+    });
+    return discharged;
   }
 
   async createDiagnosticOrder(
@@ -1101,6 +1227,7 @@ export class HaHService {
         eligibility: true,
         carePlan: true,
         carePlanRevisions: { orderBy: { version: "desc" }, take: 10 },
+        clinicalEvaluations: { orderBy: { evaluatedAt: "desc" }, take: 20 },
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,

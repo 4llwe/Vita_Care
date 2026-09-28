@@ -20,6 +20,7 @@ import {
   AdmitEpisodeDto,
   AssessEligibilityDto,
   CarePlanDto,
+  CreateClinicalEvaluationDto,
   CreateClinicalProtocolDto,
   CreateDiagnosticOrderDto,
   CreateEquipmentAssignmentDto,
@@ -94,6 +95,22 @@ export class HaHController {
     return this.hah.recordObservation(id, dto, u.id);
   }
 
+  @Post("episodes/:id/evaluations")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "SUPER_ADMIN")
+  clinicalEvaluation(
+    @Param("id") id: string,
+    @Body() dto: CreateClinicalEvaluationDto,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.createClinicalEvaluation(id, dto, u.id);
+  }
+
+  @Get("episodes/:id/discharge-readiness")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  dischargeReadiness(@Param("id") id: string) {
+    return this.hah.dischargeReadiness(id);
+  }
+
   @Patch("alerts/:id/acknowledge")
   @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
   acknowledge(@Param("id") id: string, @CurrentUser() u: { id: string }) {
@@ -128,8 +145,12 @@ export class HaHController {
 
   @Post("episodes/:id/discharge")
   @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "SUPER_ADMIN")
-  discharge(@Param("id") id: string, @Body() dto: DischargeDto) {
-    return this.hah.discharge(id, dto);
+  discharge(
+    @Param("id") id: string,
+    @Body() dto: DischargeDto,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.discharge(id, dto, u.id);
   }
 
   @Post("episodes/:id/diagnostics")

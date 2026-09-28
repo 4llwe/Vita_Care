@@ -717,6 +717,13 @@ enum EquipmentAssignmentStatus {
   CANCELLED
 }
 
+enum HaHEvaluationDisposition {
+  CONTINUE_CARE
+  MODIFY_CARE_PLAN
+  DISCHARGE_READY
+  TRANSFER_RECOMMENDED
+}
+
 model HaHPatient {
   id                 String       @id @default(cuid())
   canonicalPatientId String?      @unique
@@ -776,6 +783,7 @@ model HaHEpisode {
   diagnosticOrders      HaHDiagnosticOrder[]
   equipmentAssignments  HaHEquipmentAssignment[]
   carePlanRevisions      HaHCarePlanRevision[]
+  clinicalEvaluations    HaHClinicalEvaluation[]
   messages               HaHClinicalMessage[]
   breakGlassAccesses     HaHBreakGlassAccess[]
   careAssignments       CareAssignment[]
@@ -840,6 +848,23 @@ model HaHCarePlanRevision {
   changedAt DateTime @default(now())
   @@unique([episodeId, version])
   @@index([episodeId, changedAt])
+}
+
+model HaHClinicalEvaluation {
+  id                  String                      @id @default(cuid())
+  episodeId           String
+  episode             HaHEpisode                  @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  clinicalSummary     String
+  progressNotes       String
+  goalsMet            Json
+  unmetGoals          Json?
+  disposition         HaHEvaluationDisposition
+  followUpRequired    String?
+  evaluatedById       String
+  evaluatedAt         DateTime                    @default(now())
+
+  @@index([episodeId, evaluatedAt])
+  @@index([disposition, evaluatedAt])
 }
 
 model HaHObservation {

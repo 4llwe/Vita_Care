@@ -76,5 +76,13 @@
 - Dynamic slugs, CMS descriptions, and approved internal or HTTPS destination overrides are honored by the public directory.
 - Secure patient, caregiver, monitoring, pharmacy, and payment entries preserve their intended destination through login.
 
+## Phase 2.0 — clinical evaluation and discharge safety
+- Added structured clinical evaluations linked to each Hospital at Home episode and individual care plan.
+- Evaluations record clinical progress, achieved and unmet goals, follow-up needs, and an explicit clinical disposition.
+- Active episodes require a current physician evaluation marked `DISCHARGE_READY` after the latest care-plan revision.
+- Discharge readiness now blocks closure while clinical alerts, pending diagnostics, or unacknowledged critical results remain.
+- Evaluation and discharge actions are written to the audit trail, with role and episode access enforced by the API.
+- The episode workspace displays evaluation history and a live, human-readable discharge-readiness summary.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.
