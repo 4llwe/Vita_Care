@@ -25,7 +25,7 @@ export function PublicHeader() {
           <Link href="/direktori#monitoring-pasien">Monitoring</Link>
           <details className="group relative">
             <summary className="cursor-pointer list-none rounded-lg px-2 py-2 hover:bg-teal-50 hover:text-teal-800">Semua Menu</summary>
-            <div className="absolute right-0 top-12 w-[min(72rem,calc(100vw-3rem))] rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <nav aria-label="Menu lengkap" className="absolute right-0 top-12 w-[min(72rem,calc(100vw-3rem))] rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
               <p className="text-xs font-black uppercase tracking-[.18em] text-teal-700">Direktori Hospital at Home</p>
               <div className="mt-4 grid grid-cols-3 gap-2 xl:grid-cols-4">
                 {navigationMenu.map((group) => (
@@ -34,7 +34,7 @@ export function PublicHeader() {
                   </Link>
                 ))}
               </div>
-            </div>
+            </nav>
           </details>
         </nav>
         <div className="flex items-center gap-1.5 sm:gap-2">
