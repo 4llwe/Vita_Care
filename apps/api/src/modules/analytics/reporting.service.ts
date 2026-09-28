@@ -34,7 +34,11 @@ export class ReportingService {
 
   // ============ PDF: Laporan Manajemen (ringkasan KPI) ============
   async managementReportPdf(): Promise<Buffer> {
-    const s = await this.analytics.dashboard();
+    const s = await this.analytics.dashboard({
+      id: 'system-management-report',
+      role: 'SUPER_ADMIN',
+      roles: ['SUPER_ADMIN'],
+    });
     return buildPdf((doc) => {
       drawLetterhead(doc, 'LAPORAN MANAJEMEN MUTU & OPERASIONAL');
 

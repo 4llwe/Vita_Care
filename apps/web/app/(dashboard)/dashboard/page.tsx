@@ -7,6 +7,7 @@ import type { DashboardSummary } from "../../../lib/types";
 import {
   fetchMe,
   getRole,
+  personaFor,
   ROLE_LABEL,
   type Role,
   type Session,
@@ -25,7 +26,11 @@ const TITLE: Partial<Record<Role, string>> = {
   UNIT_HEAD: "Dashboard Kepala Unit",
   COORDINATOR: "Dashboard Koordinator",
   HEALTH_WORKER: "Dashboard Tenaga Kesehatan",
+  DOCTOR: "Dashboard Dokter",
+  NURSE: "Dashboard Perawat",
+  FINANCE: "Dashboard Keuangan",
   PATIENT: "Dashboard Pasien",
+  CAREGIVER: "Dashboard Keluarga & Caregiver",
 };
 
 export default function DashboardPage() {
@@ -65,7 +70,11 @@ export default function DashboardPage() {
         <DashboardExports role={role} />
       </div>
 
-      <RoleDashboard role={role} data={data} />
+      <RoleDashboard
+        role={role}
+        persona={personaFor(me ?? { id: "", name: "", email: "", role })}
+        data={data}
+      />
     </div>
   );
 }

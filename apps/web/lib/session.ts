@@ -35,17 +35,33 @@ export type AuthSession = {
   expiresAt: string;
 };
 
-export type ClinicalPersona = "admin" | "doctor" | "nurse" | "patient" | "governance";
+export type ClinicalPersona =
+  | "admin"
+  | "doctor"
+  | "nurse"
+  | "finance"
+  | "patient"
+  | "caregiver"
+  | "governance";
 
 export function personaFor(session: Session | null): ClinicalPersona {
   if (!session) return "patient";
-  if (session.role === "SUPER_ADMIN" || session.role === "COORDINATOR") return "admin";
-  if (session.role === "PATIENT" || session.role === "CAREGIVER") return "patient";
-  if (session.role === "NURSE") return "nurse";
-  if (session.role === "DOCTOR") return "doctor";
-  if (session.role !== "HEALTH_WORKER") return "governance";
-  const p = (session.healthWorkerProfile?.profession ?? "").toLowerCase();
-  return p.includes("perawat") || p.includes("bidan") ? "nurse" : "doctor";
+  const roles = new Set([session.role, ...(session.roles ?? [])]);
+  if (roles.has("SUPER_ADMIN") || roles.has("COORDINATOR")) return "admin";
+  if (session.role === "CAREGIVER") return "caregiver";
+  if (session.role === "PATIENT") return "patient";
+  if (roles.has("NURSE")) return "nurse";
+  if (roles.has("DOCTOR")) return "doctor";
+  if (roles.has("FINANCE")) return "finance";
+  if (session.role === "HEALTH_WORKER") {
+    const profession = (session.healthWorkerProfile?.profession ?? "").toLowerCase();
+    return profession.includes("perawat") || profession.includes("bidan")
+      ? "nurse"
+      : "doctor";
+  }
+  if (roles.has("CAREGIVER")) return "caregiver";
+  if (roles.has("PATIENT")) return "patient";
+  return "governance";
 }
 
 export const ROLE_LABEL: Record<string, string> = {
