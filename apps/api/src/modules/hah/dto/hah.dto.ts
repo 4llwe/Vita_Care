@@ -99,6 +99,18 @@ export class CreateClinicalEvaluationDto {
   @IsOptional() @IsString() followUpRequired?: string;
 }
 
+export class CreateEmergencyEventDto {
+  @IsIn(["MEDICAL_TEAM", "HOSPITAL", "AMBULANCE", "LOCATION_SHARED"])
+  action!: string;
+  @IsOptional() @IsNumber() @Min(-90) @Max(90) latitude?: number;
+  @IsOptional() @IsNumber() @Min(-180) @Max(180) longitude?: number;
+  @IsOptional() @IsString() note?: string;
+}
+
+export class ResolveEmergencyEventDto {
+  @IsString() @MinLength(5) resolution!: string;
+}
+
 export class RecordObservationDto {
   @IsInt() @Min(40) @Max(300) systolic!: number;
   @IsInt() @Min(20) @Max(200) diastolic!: number;

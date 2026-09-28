@@ -66,6 +66,13 @@ export class HaHAccessGuard implements CanActivate {
           select: { episodeId: true },
         })
       )?.episodeId;
+    else if (path.includes("emergency-events/:id"))
+      episodeId = (
+        await this.prisma.haHEmergencyEvent.findUnique({
+          where: { id },
+          select: { episodeId: true },
+        })
+      )?.episodeId;
     if (!episodeId) throw new ForbiddenException("Resource klinis tidak dapat diakses");
     const episode = await this.prisma.haHEpisode.findFirst({
       where:

@@ -92,5 +92,13 @@
 - Added episode-level adherence calculations and patient/family views for scheduled, given, delayed, refused, omitted, and missed doses.
 - Medication adherence is presented as monitoring support and never as an automated diagnosis.
 
+## Phase 2.2 — emergency response workflow
+- Connected the persistent Emergency action to authenticated Hospital at Home episodes without removing public emergency-call access.
+- Added a protected emergency summary with patient identity, diagnosis, allergies, emergency plan, latest vital signs, and family contact.
+- Calls to the medical team, hospital, or ambulance and patient-location sharing create auditable emergency events.
+- Emergency events notify the clinical command channel and appear in the notification center for acknowledgement and resolution.
+- Location is recorded only after explicit device permission and only for an authenticated, authorized episode.
+- Public users can still call configured emergency numbers; failure to record an event never blocks the phone action.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

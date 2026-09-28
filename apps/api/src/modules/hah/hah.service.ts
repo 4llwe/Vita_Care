@@ -6,6 +6,8 @@ import {
   CareAssignmentType,
   DiagnosticOrderStatus,
   EquipmentAssignmentStatus,
+  EmergencyAction,
+  EmergencyEventStatus,
   HaHEvaluationDisposition,
   HaHEligibilityDecision,
   HaHEpisodeStatus,
@@ -23,6 +25,7 @@ import {
   AssessEligibilityDto,
   CarePlanDto,
   CreateClinicalEvaluationDto,
+  CreateEmergencyEventDto,
   CreateClinicalProtocolDto,
   CreateDiagnosticOrderDto,
   CreateEquipmentAssignmentDto,
@@ -1333,6 +1336,121 @@ export class HaHService {
     }
   }
 
+  async createEmergencyEvent(
+    episodeId: string,
+    dto: CreateEmergencyEventDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (
+      !(
+        [
+          HaHEpisodeStatus.ADMITTED,
+          HaHEpisodeStatus.ACTIVE,
+          HaHEpisodeStatus.TRANSFER_REQUESTED,
+        ] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException("Episode tidak aktif untuk respons darurat");
+    if (
+      (dto.latitude === undefined) !== (dto.longitude === undefined)
+    )
+      throw new BadRequestException(
+        "Latitude dan longitude harus dikirim bersama",
+      );
+    const event = await this.prisma.haHEmergencyEvent.create({
+      data: {
+        episodeId,
+        actorId,
+        action: dto.action as EmergencyAction,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        note: dto.note,
+      },
+    });
+    await this.auditEpisodeEvent(actorId, "EMERGENCY_ACTION_STARTED", episodeId, {
+      emergencyEventId: event.id,
+      action: event.action,
+      hasLocation: event.latitude !== null,
+    });
+    await this.notify.enqueueClinical(
+      `DARURAT · ${event.action.replaceAll("_", " ")}`,
+      `${episode.code}: bantuan darurat dimulai. Segera verifikasi kondisi, lokasi, dan jalur eskalasi pasien.`,
+    );
+    return event;
+  }
+
+  listOpenEmergencyEvents() {
+    return this.prisma.haHEmergencyEvent.findMany({
+      where: { status: { not: EmergencyEventStatus.RESOLVED } },
+      include: {
+        episode: {
+          include: {
+            patient: true,
+            observations: { orderBy: { recordedAt: "desc" }, take: 1 },
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+      take: 100,
+    });
+  }
+
+  async acknowledgeEmergencyEvent(id: string, actorId: string) {
+    const claimed = await this.prisma.haHEmergencyEvent.updateMany({
+      where: { id, status: EmergencyEventStatus.OPEN },
+      data: {
+        status: EmergencyEventStatus.ACKNOWLEDGED,
+        acknowledgedById: actorId,
+        acknowledgedAt: new Date(),
+      },
+    });
+    if (!claimed.count) {
+      const current = await this.prisma.haHEmergencyEvent.findUnique({
+        where: { id },
+      });
+      if (!current) throw new NotFoundException("Kejadian darurat tidak ditemukan");
+      if (current.status === EmergencyEventStatus.RESOLVED)
+        throw new BadRequestException("Kejadian darurat sudah diselesaikan");
+      return current;
+    }
+    const event = await this.prisma.haHEmergencyEvent.findUniqueOrThrow({
+      where: { id },
+    });
+    await this.auditEpisodeEvent(
+      actorId,
+      "EMERGENCY_ACTION_ACKNOWLEDGED",
+      event.episodeId,
+      { emergencyEventId: id },
+    );
+    return event;
+  }
+
+  async resolveEmergencyEvent(id: string, actorId: string, resolution: string) {
+    const current = await this.prisma.haHEmergencyEvent.findUnique({
+      where: { id },
+    });
+    if (!current) throw new NotFoundException("Kejadian darurat tidak ditemukan");
+    if (current.status === EmergencyEventStatus.RESOLVED)
+      throw new BadRequestException("Kejadian darurat sudah diselesaikan");
+    const event = await this.prisma.haHEmergencyEvent.update({
+      where: { id },
+      data: {
+        status: EmergencyEventStatus.RESOLVED,
+        acknowledgedById: current.acknowledgedById ?? actorId,
+        acknowledgedAt: current.acknowledgedAt ?? new Date(),
+        resolvedById: actorId,
+        resolvedAt: new Date(),
+        resolution,
+      },
+    });
+    await this.auditEpisodeEvent(actorId, "EMERGENCY_ACTION_RESOLVED", event.episodeId, {
+      emergencyEventId: id,
+      resolution,
+    });
+    return event;
+  }
+
   listEpisodes(status?: HaHEpisodeStatus, actor?: AuthActor) {
     const access =
       actor?.role === "PATIENT"
@@ -1409,6 +1527,7 @@ export class HaHService {
         carePlan: true,
         carePlanRevisions: { orderBy: { version: "desc" }, take: 10 },
         clinicalEvaluations: { orderBy: { evaluatedAt: "desc" }, take: 20 },
+        emergencyEvents: { orderBy: { createdAt: "desc" }, take: 20 },
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,
