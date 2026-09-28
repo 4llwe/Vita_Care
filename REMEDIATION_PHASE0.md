@@ -100,5 +100,13 @@
 - Location is recorded only after explicit device permission and only for an authenticated, authorized episode.
 - Public users can still call configured emergency numbers; failure to record an event never blocks the phone action.
 
+## Phase 2.3 — caregiver consent and field-level privacy
+- Added a fixed caregiver-consent vocabulary for summary, vital signs, care plan, medication, diagnostics, schedule, and clinical messages.
+- Caregiver scope is enforced by the API for both direct endpoints and episode payload fields; hiding a menu is not treated as a security boundary.
+- Patient identity numbers and emergency-event history are never exposed through caregiver access.
+- Patients may grant, update, review, expire, and revoke caregiver access from the existing family workspace using the caregiver's account email.
+- Consent requires a timestamp, named consent giver, mandatory summary scope, and a valid optional expiration.
+- Users with both Patient and Caregiver roles retain full access to their own record while receiving scoped access to another patient's record.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

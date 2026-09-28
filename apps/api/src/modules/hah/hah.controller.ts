@@ -310,7 +310,7 @@ export class HaHController {
   }
 
   @Get("episodes/:id/caregivers")
-  @Roles("PATIENT", "CAREGIVER", "HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  @Roles("PATIENT", "HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
   caregivers(@Param("id") id: string) {
     return this.hah.listCaregivers(id);
   }

@@ -1,0 +1,43 @@
+export const CAREGIVER_SCOPES = [
+  "SUMMARY",
+  "VITALS",
+  "CARE_PLAN",
+  "MEDICATIONS",
+  "DIAGNOSTICS",
+  "SCHEDULE",
+  "MESSAGES",
+] as const;
+
+export type CaregiverScope = (typeof CAREGIVER_SCOPES)[number];
+
+export function requiredCaregiverScope(
+  path: string,
+): CaregiverScope | null {
+  if (path.includes("emergency-events")) return null;
+  if (path.includes("messages")) return "MESSAGES";
+  if (
+    path.includes("medication-adherence") ||
+    path.includes("medications")
+  )
+    return "MEDICATIONS";
+  if (path.includes("diagnostics")) return "DIAGNOSTICS";
+  if (path.includes("visits")) return "SCHEDULE";
+  if (path.includes("observations") || path.includes("alerts"))
+    return "VITALS";
+  if (
+    path.includes("care-plan") ||
+    path.includes("evaluations") ||
+    path.includes("equipment") ||
+    path.includes("transfers") ||
+    path.includes("discharge-readiness")
+  )
+    return "CARE_PLAN";
+  return "SUMMARY";
+}
+
+export function caregiverScopeList(value: unknown): CaregiverScope[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((scope): scope is CaregiverScope =>
+    CAREGIVER_SCOPES.includes(scope as CaregiverScope),
+  );
+}

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import {
   Prisma,
   ClinicalAlertSeverity,
@@ -48,6 +48,7 @@ import {
   computeHaHClinicalScore,
 } from "./clinical-score";
 import { validateClinicalProtocol } from "./clinical-protocol.validation";
+import { caregiverScopeList } from "./caregiver-scope";
 
 @Injectable()
 export class HaHService {
@@ -852,11 +853,11 @@ export class HaHService {
         "Medication order memerlukan episode admitted/active",
       );
     const allergies = Array.isArray(episode.patient.allergies)
-      ? episode.patient.allergies.map((x) => String(x).toLowerCase())
+      ? episode.patient.allergies.map((x: unknown) => String(x).toLowerCase())
       : [];
     if (
       allergies.some(
-        (a) =>
+        (a: string) =>
           dto.medicationName.toLowerCase().includes(a) ||
           a.includes(dto.medicationName.toLowerCase()),
       )
@@ -1188,8 +1189,12 @@ export class HaHService {
     actorId: string,
   ) {
     const episode = await this.requireEpisode(episodeId);
-    const caregiver = await this.prisma.user.findUnique({
-      where: { id: dto.caregiverUserId },
+    if (!dto.caregiverUserId && !dto.caregiverEmail)
+      throw new BadRequestException("ID atau email caregiver wajib diisi");
+    const caregiver = await this.prisma.user.findFirst({
+      where: dto.caregiverUserId
+        ? { id: dto.caregiverUserId }
+        : { email: dto.caregiverEmail },
     });
     if (
       !caregiver ||
@@ -1199,26 +1204,34 @@ export class HaHService {
       throw new BadRequestException(
         "Akun caregiver tidak aktif atau perannya tidak sesuai",
       );
+    if (!dto.scope.includes("SUMMARY"))
+      throw new BadRequestException("Scope SUMMARY wajib untuk akses caregiver");
+    const consentAt = new Date(dto.consentAt);
+    const expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : undefined;
+    if (consentAt > new Date())
+      throw new BadRequestException("Waktu consent tidak boleh di masa depan");
+    if (expiresAt && expiresAt <= consentAt)
+      throw new BadRequestException("Masa berlaku harus setelah waktu consent");
     const access = await this.prisma.haHCaregiverAccess.upsert({
       where: {
         patientId_caregiverId: {
           patientId: episode.patientId,
-          caregiverId: dto.caregiverUserId,
+          caregiverId: caregiver.id,
         },
       },
       create: {
         patientId: episode.patientId,
-        caregiverId: dto.caregiverUserId,
+        caregiverId: caregiver.id,
         scope: dto.scope,
         consentBy: dto.consentBy,
-        consentAt: new Date(dto.consentAt),
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
+        consentAt,
+        expiresAt,
       },
       update: {
         scope: dto.scope,
         consentBy: dto.consentBy,
-        consentAt: new Date(dto.consentAt),
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+        consentAt,
+        expiresAt: expiresAt ?? null,
         revokedAt: null,
         revokedById: null,
       },
@@ -1451,31 +1464,47 @@ export class HaHService {
     return event;
   }
 
-  listEpisodes(status?: HaHEpisodeStatus, actor?: AuthActor) {
+  async listEpisodes(status?: HaHEpisodeStatus, actor?: AuthActor) {
+    const isClinical = !!actor && actorHasAnyRole(actor, CLINICAL_ROLES);
+    const isPatient = !!actor && actorHasAnyRole(actor, ["PATIENT"]);
+    const isCaregiver = !!actor && actorHasAnyRole(actor, ["CAREGIVER"]);
     const access =
-      actor?.role === "PATIENT"
-        ? { patient: { portalUserId: actor.id } }
-        : actor?.role === "CAREGIVER"
-          ? {
-              patient: {
-                caregiverAccesses: {
-                  some: {
-                    caregiverId: actor.id,
-                    revokedAt: null,
-                    OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-                  },
-                },
-              },
-            }
-          : actor && actorHasAnyRole(actor, CLINICAL_ROLES)
+      actor && isClinical
             ? {
                 OR: [
                   { attendingPhysicianId: actor.id },
                   { visits: { some: { healthWorker: { userId: actor.id } } } },
                 ],
               }
+            : actor && (isPatient || isCaregiver)
+              ? {
+                  OR: [
+                    ...(isPatient
+                      ? [{ patient: { portalUserId: actor.id } }]
+                      : []),
+                    ...(isCaregiver
+                      ? [
+                          {
+                            patient: {
+                              caregiverAccesses: {
+                                some: {
+                                  caregiverId: actor.id,
+                                  revokedAt: null,
+                                  scope: { array_contains: ["SUMMARY"] },
+                                  OR: [
+                                    { expiresAt: null },
+                                    { expiresAt: { gt: new Date() } },
+                                  ],
+                                },
+                              },
+                            },
+                          },
+                        ]
+                      : []),
+                  ],
+                }
             : {};
-    return this.prisma.haHEpisode.findMany({
+    const rows = await this.prisma.haHEpisode.findMany({
       where: { ...access, ...(status ? { status } : {}) },
       orderBy: { createdAt: "desc" },
       include: {
@@ -1484,6 +1513,35 @@ export class HaHService {
         carePlan: true,
         _count: { select: { alerts: true, observations: true, visits: true } },
       },
+    });
+    if (!actor || isClinical || !isCaregiver) return rows;
+    const caregiverRows = rows.filter(
+      (row) => row.patient.portalUserId !== actor.id,
+    );
+    const grants = await this.prisma.haHCaregiverAccess.findMany({
+      where: {
+        caregiverId: actor.id,
+        patientId: { in: caregiverRows.map((row) => row.patientId) },
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { patientId: true, scope: true },
+    });
+    const scopes = new Map(
+      grants.map((grant) => [
+        grant.patientId,
+        caregiverScopeList(grant.scope),
+      ]),
+    );
+    return rows.map((row) => {
+      if (row.patient.portalUserId === actor.id) return row;
+      const scope = scopes.get(row.patientId) ?? [];
+      return {
+        ...row,
+        eligibility: scope.includes("CARE_PLAN") ? row.eligibility : null,
+        carePlan: scope.includes("CARE_PLAN") ? row.carePlan : null,
+        patient: { ...row.patient, nationalId: null },
+      };
     });
   }
 
@@ -1496,28 +1554,43 @@ export class HaHService {
   }
 
   async getEpisode(id: string, actor?: AuthActor) {
+    const isClinical = !!actor && actorHasAnyRole(actor, CLINICAL_ROLES);
+    const isPatient = !!actor && actorHasAnyRole(actor, ["PATIENT"]);
+    const isCaregiver = !!actor && actorHasAnyRole(actor, ["CAREGIVER"]);
     const access =
-      actor?.role === "PATIENT"
-        ? { patient: { portalUserId: actor.id } }
-        : actor?.role === "CAREGIVER"
-          ? {
-              patient: {
-                caregiverAccesses: {
-                  some: {
-                    caregiverId: actor.id,
-                    revokedAt: null,
-                    OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-                  },
-                },
-              },
-            }
-          : actor && actorHasAnyRole(actor, CLINICAL_ROLES)
+      actor && isClinical
             ? {
                 OR: [
                   { attendingPhysicianId: actor.id },
                   { visits: { some: { healthWorker: { userId: actor.id } } } },
                 ],
               }
+            : actor && (isPatient || isCaregiver)
+              ? {
+                  OR: [
+                    ...(isPatient
+                      ? [{ patient: { portalUserId: actor.id } }]
+                      : []),
+                    ...(isCaregiver
+                      ? [
+                          {
+                            patient: {
+                              caregiverAccesses: {
+                                some: {
+                                  caregiverId: actor.id,
+                                  revokedAt: null,
+                                  OR: [
+                                    { expiresAt: null },
+                                    { expiresAt: { gt: new Date() } },
+                                  ],
+                                },
+                              },
+                            },
+                          },
+                        ]
+                      : []),
+                  ],
+                }
             : {};
     const result = await this.prisma.haHEpisode.findFirstOrThrow({
       where: { id, ...access },
@@ -1551,7 +1624,49 @@ export class HaHService {
           entityId: id,
         },
       });
-    return result;
+    const caregiverMode =
+      !!actor &&
+      !isClinical &&
+      isCaregiver &&
+      result.patient.portalUserId !== actor.id;
+    if (!caregiverMode) return result;
+    const grant = await this.prisma.haHCaregiverAccess.findFirst({
+      where: {
+        patientId: result.patientId,
+        caregiverId: actor.id,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { scope: true, consentAt: true, expiresAt: true },
+    });
+    const scope = caregiverScopeList(grant?.scope);
+    if (!grant || !scope.includes("SUMMARY"))
+      throw new ForbiddenException("Consent caregiver tidak mencakup ringkasan");
+    const visible: any = result;
+    visible.patient.nationalId = null;
+    if (!scope.includes("VITALS")) {
+      visible.observations = [];
+      visible.alerts = [];
+    }
+    if (!scope.includes("CARE_PLAN")) {
+      visible.eligibility = null;
+      visible.carePlan = null;
+      visible.carePlanRevisions = [];
+      visible.clinicalEvaluations = [];
+      visible.transfers = [];
+      visible.equipmentAssignments = [];
+    }
+    if (!scope.includes("MEDICATIONS")) visible.medicationOrders = [];
+    if (!scope.includes("DIAGNOSTICS")) visible.diagnosticOrders = [];
+    if (!scope.includes("SCHEDULE")) visible.visits = [];
+    if (!scope.includes("MESSAGES")) visible.messages = [];
+    visible.emergencyEvents = [];
+    visible.caregiverAccess = {
+      scope,
+      consentAt: grant.consentAt,
+      expiresAt: grant.expiresAt,
+    };
+    return visible;
   }
 
   private async requireEpisode(id: string) {

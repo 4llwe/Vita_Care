@@ -6,6 +6,10 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/actor";
+import {
+  caregiverScopeList,
+  requiredCaregiverScope,
+} from "./caregiver-scope";
 @Injectable()
 export class HaHAccessGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
@@ -74,48 +78,82 @@ export class HaHAccessGuard implements CanActivate {
         })
       )?.episodeId;
     if (!episodeId) throw new ForbiddenException("Resource klinis tidak dapat diakses");
-    const episode = await this.prisma.haHEpisode.findFirst({
-      where:
-        user.role === "PATIENT"
-          ? { id: episodeId, patient: { portalUserId: user.id } }
-          : user.role === "CAREGIVER"
-            ? {
-                id: episodeId,
-                patient: {
-                  caregiverAccesses: {
-                    some: {
-                      caregiverId: user.id,
-                      revokedAt: null,
-                      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-                    },
+    const isClinical = actorHasAnyRole(user, CLINICAL_ROLES);
+    const isPatient = actorHasAnyRole(user, ["PATIENT"]);
+    const isCaregiver = actorHasAnyRole(user, ["CAREGIVER"]);
+    const personalAccess = [
+      ...(isPatient ? [{ patient: { portalUserId: user.id } }] : []),
+      ...(isCaregiver
+        ? [
+            {
+              patient: {
+                caregiverAccesses: {
+                  some: {
+                    caregiverId: user.id,
+                    revokedAt: null,
+                    OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
                   },
                 },
-              }
-            : actorHasAnyRole(user, CLINICAL_ROLES) ? {
-                id: episodeId,
-                OR: [
-                  { attendingPhysicianId: user.id },
-                  { visits: { some: { healthWorker: { userId: user.id } } } },
-                  {
-                    breakGlassAccesses: {
-                      some: {
-                        userId: user.id,
-                        revokedAt: null,
-                        expiresAt: { gt: new Date() },
-                      },
-                    },
+              },
+            },
+          ]
+        : []),
+    ];
+    const episode = await this.prisma.haHEpisode.findFirst({
+      where: isClinical
+        ? {
+            id: episodeId,
+            OR: [
+              { attendingPhysicianId: user.id },
+              { visits: { some: { healthWorker: { userId: user.id } } } },
+              {
+                breakGlassAccesses: {
+                  some: {
+                    userId: user.id,
+                    revokedAt: null,
+                    expiresAt: { gt: new Date() },
                   },
-                ],
-              } : { id: "__no_episode_access__" },
-      select: { id: true },
+                },
+              },
+            ],
+          }
+        : personalAccess.length
+          ? { id: episodeId, OR: personalAccess }
+          : { id: "__no_episode_access__" },
+      select: { id: true, patient: { select: { portalUserId: true } } },
     });
     if (!episode)
       throw new ForbiddenException("Anda tidak memiliki akses aktif ke episode ini");
+    const caregiverMode =
+      !isClinical && isCaregiver && episode.patient.portalUserId !== user.id;
+    if (caregiverMode) {
+      if (path.includes("caregivers"))
+        throw new ForbiddenException(
+          "Hanya pasien atau koordinator yang dapat mengelola akses caregiver",
+        );
+      const grant = await this.prisma.haHCaregiverAccess.findFirst({
+        where: {
+          caregiverId: user.id,
+          revokedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          patient: { episodes: { some: { id: episodeId } } },
+        },
+        select: { scope: true },
+      });
+      const required = requiredCaregiverScope(path);
+      if (
+        !grant ||
+        (required && !caregiverScopeList(grant.scope).includes(required))
+      )
+        throw new ForbiddenException(
+          `Consent caregiver tidak mencakup ${required ?? "akses ini"}`,
+        );
+    }
 
     // UI navigation is not a security boundary. Enforce clinical scope on the
     // server so a non-doctor cannot prescribe, approve, or discharge by calling
     // the API directly. Existing HEALTH_WORKER roles remain supported.
-    if (actorHasAnyRole(user, CLINICAL_ROLES) && req.method !== "GET") {
+    if (isClinical && req.method !== "GET") {
       const profile = await this.prisma.healthWorker.findUnique({
         where: { userId: user.id },
         select: { profession: true, isActive: true, licenseValidUntil: true },
