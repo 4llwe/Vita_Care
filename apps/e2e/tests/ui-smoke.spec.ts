@@ -1,5 +1,5 @@
 import { test, expect, request as playwrightRequest } from '@playwright/test';
-import { loginApi, seedAuth } from './helpers';
+import { authenticatePage } from './helpers';
 
 test.describe('UI smoke', () => {
   test('halaman login tampil', async ({ page }) => {
@@ -13,12 +13,10 @@ test.describe('UI smoke', () => {
     expect(page.url()).toContain('/login');
   });
 
-  test('dashboard tampil setelah token disuntikkan', async ({ page }) => {
+  test('dashboard tampil setelah sesi autentikasi valid disiapkan', async ({ page }) => {
     const request = await playwrightRequest.newContext();
-    const token = await loginApi(request);
+    await authenticatePage(page, request);
     await request.dispose();
-
-    await seedAuth(page, token);
     await page.goto('/dashboard');
     await expect(page.getByText('Dashboard Manajemen')).toBeVisible();
     await expect(page.getByText(/Laporan Manajemen/i)).toBeVisible();

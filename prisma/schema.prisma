@@ -111,6 +111,64 @@ model User {
   protocolApprovals HaHClinicalProtocolApproval[] @relation("ProtocolApprover")
   breakGlassAccesses HaHBreakGlassAccess[] @relation("BreakGlassUser")
   patientBookings Booking[] @relation("BookingPatientAccount")
+  authSessions AuthSession[]
+  authSecurityEvents AuthSecurityEvent[]
+}
+
+model AuthSession {
+  id             String              @id @default(cuid())
+  userId         String
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName     String?
+  userAgent      String?
+  ipAddress      String?
+  createdAt      DateTime            @default(now())
+  lastSeenAt     DateTime            @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  revokedReason  String?
+  refreshTokens  RefreshToken[]
+  securityEvents AuthSecurityEvent[]
+
+  @@index([userId, revokedAt, expiresAt])
+  @@index([userId, lastSeenAt])
+}
+
+model RefreshToken {
+  id           String        @id @default(cuid())
+  sessionId    String
+  session      AuthSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tokenIdHash  String        @unique
+  secretHash   String
+  issuedAt     DateTime      @default(now())
+  expiresAt    DateTime
+  lastUsedAt   DateTime?
+  rotatedAt    DateTime?
+  revokedAt    DateTime?
+  replacedById String?       @unique
+  replacedBy   RefreshToken? @relation("RefreshTokenReplacement", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces     RefreshToken? @relation("RefreshTokenReplacement")
+  revokeReason String?
+
+  @@index([sessionId, rotatedAt, revokedAt])
+  @@index([sessionId, expiresAt])
+}
+
+model AuthSecurityEvent {
+  id        String       @id @default(cuid())
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sessionId String?
+  session   AuthSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  eventType String
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([eventType, createdAt])
 }
 
 model Service {

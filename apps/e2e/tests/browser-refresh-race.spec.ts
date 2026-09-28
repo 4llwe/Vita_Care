@@ -1,0 +1,57 @@
+import { test, expect } from "@playwright/test";
+import { raceAuthStatePath } from "../global-setup";
+import { readFileSync } from "node:fs";
+
+const apiUrl = process.env.E2E_API_URL ?? "http://localhost:3001";
+
+test("two tabs recover without revoking the shared session", async ({ browser }) => {
+  const state = JSON.parse(readFileSync(raceAuthStatePath, "utf8")) as {
+    cookies: Array<Record<string, unknown> & { name: string; value: string }>;
+    origins: unknown[];
+  };
+  const accessCookie = state.cookies.find((cookie) => cookie.name === "vc_access");
+  expect(accessCookie).toBeTruthy();
+  const context = await browser.newContext({
+    storageState: {
+      origins: state.origins,
+      cookies: state.cookies.map((cookie) =>
+        cookie.name === "vc_access" ? { ...cookie, value: "invalid.access.token" } : cookie,
+      ),
+    },
+  });
+  const first = await context.newPage();
+  const second = await context.newPage();
+  let refreshRequests = 0;
+  for (const page of [first, second]) {
+    page.on("request", (request) => {
+      if (request.url().endsWith("/api/auth/refresh")) refreshRequests += 1;
+    });
+  }
+
+  await Promise.all([first.goto("/dashboard"), second.goto("/dashboard")]);
+  await expect.poll(() => refreshRequests).toBeGreaterThanOrEqual(1);
+  await expect.poll(async () => {
+    return Promise.all(
+      [first, second].map((page) =>
+        page.evaluate(async (baseUrl) => {
+          const response = await fetch(`${baseUrl}/api/auth/me`, {
+            credentials: "include",
+          });
+          return response.status;
+        }, apiUrl),
+      ),
+    );
+  }, { timeout: 10_000 }).toEqual([200, 200]);
+  await expect.poll(async () =>
+    first.evaluate(async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/auth/sessions`, {
+        credentials: "include",
+      });
+      return response.status;
+    }, apiUrl),
+  ).toBe(200);
+
+  expect(refreshRequests).toBeLessThanOrEqual(2);
+
+  await context.close();
+});

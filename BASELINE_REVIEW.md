@@ -29,13 +29,17 @@ is included in the baseline.
 
 ## Required validation before any staging write
 
-1. `sh scripts/create-baseline-migration.sh` regenerates an identical baseline.
+1. `sh scripts/create-baseline-migration.sh` regenerates an identical baseline before any post-baseline migrations are added.
 2. `sh scripts/check-migrations.sh` reports complete schema coverage.
 3. `pnpm exec prisma migrate deploy` succeeds on a disposable PostgreSQL database.
 4. A second `pnpm exec prisma migrate deploy` is a no-op.
 5. `pnpm exec prisma migrate status` reports the database is up to date.
 6. Unit, build, authorization, and Playwright checks remain green.
 7. Snapshot or recreate-point for the fresh Neon staging database is confirmed.
+
+Post-baseline schema changes must use additive forward-only migrations. The Phase 1.1
+refresh-session migration is intentionally separate from the reviewed Phase 0 baseline;
+do not rewrite or drop the baseline to include it.
 
 ## Production restriction
 
