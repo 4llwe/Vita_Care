@@ -13,6 +13,9 @@ const label: Record<string, string> = {
   notifications: "Notifikasi Klinis",
   "clinical-protocol": "Protokol EWS",
   "service-requests": "Permintaan Layanan",
+  users: "Manajemen Pengguna",
+  reports: "Pusat Laporan",
+  settings: "Status Konfigurasi",
   "menu-management": "Manajemen Menu",
 };
 export function Breadcrumbs() {

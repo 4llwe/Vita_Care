@@ -40,6 +40,24 @@ enum BookingStatus {
   DIBATALKAN
 }
 
+enum PayerType {
+  SELF_PAY
+  PRIVATE_INSURANCE
+  BPJS_JKN
+  CORPORATE
+}
+
+enum ClaimStatus {
+  NOT_APPLICABLE
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  PAID
+}
+
 enum FindingCategory {
   MINOR
   MAYOR
@@ -364,12 +382,21 @@ model Invoice {
   tax            Int           @default(0)
   total          Int
   status         InvoiceStatus @default(UNPAID)
+  payerType      PayerType     @default(SELF_PAY)
+  insurerName    String?
+  memberNumber   String?
+  claimNumber    String?
+  claimStatus    ClaimStatus   @default(NOT_APPLICABLE)
+  coveredAmount  Int           @default(0)
   midtransOrderId String?      @unique
   snapToken      String?
   issuedAt       DateTime      @default(now())
   paidAt         DateTime?
   items          InvoiceItem[]
   payments       Payment[]
+
+  @@index([payerType, claimStatus, issuedAt])
+  @@index([claimNumber])
 }
 
 model InvoiceItem {

@@ -13,8 +13,8 @@ const menus: Record<ClinicalPersona, Item[]> = {
     ["/hah", "Manajemen Pasien"], ["/master", "Tenaga Kesehatan & Layanan"],
     ["/bookings", "Jadwal"], ["/workspace/farmasi", "Farmasi"],
     ["/workspace/laboratorium", "Laboratorium"], ["/invoices", "Pembayaran"],
-    ["/referrals", "Rujukan"], ["/workspace/laporan", "Laporan"],
-    ["/workspace/pengguna", "Manajemen Pengguna"], ["/workspace/pengaturan", "Pengaturan Sistem"],
+    ["/referrals", "Rujukan"], ["/reports", "Laporan"],
+    ["/users", "Manajemen Pengguna"], ["/settings", "Pengaturan Sistem"],
     ["/clinical-protocol", "Protokol EWS"], ["/service-requests", "Permintaan Layanan"],
     ["/menu-management", "Manajemen Menu"],
   ]),
@@ -24,7 +24,7 @@ const menus: Record<ClinicalPersona, Item[]> = {
     ["/medical-records/new", "Rekam Medis"], ["/workspace/rencana-terapi", "Rencana Terapi"],
     ["/workspace/resep", "Resep"], ["/workspace/hasil-laboratorium", "Hasil Laboratorium"],
     ["/bookings", "Jadwal Kunjungan"], ["/workspace/telekonsultasi", "Telekonsultasi"],
-    ["/referrals", "Rujukan"], ["/workspace/laporan", "Laporan"],
+    ["/referrals", "Rujukan"], ["/reports", "Laporan"],
   ]),
   nurse: asItems([
     ["/dashboard", "Dashboard Perawat"], ["/notifications", "Notifikasi Klinis"],
@@ -32,12 +32,12 @@ const menus: Record<ClinicalPersona, Item[]> = {
     ["/workspace/asesmen-keperawatan", "Asesmen Keperawatan"], ["/monitoring", "Tanda Vital"],
     ["/workspace/rencana-asuhan", "Rencana Asuhan"], ["/workspace/pemberian-obat", "Pemberian Obat"],
     ["/workspace/perawatan-luka", "Perawatan Luka"], ["/workspace/edukasi-pasien", "Edukasi Pasien"],
-    ["/hah?focus=alerts", "Eskalasi Klinis"], ["/workspace/laporan", "Laporan"],
+    ["/hah?focus=alerts", "Eskalasi Klinis"], ["/reports", "Laporan"],
   ]),
   finance: asItems([
     ["/dashboard", "Dashboard Keuangan"], ["/invoices", "Tagihan & Pembayaran"],
-    ["/master", "Paket & Daftar Tarif"], ["/workspace/asuransi", "Asuransi"],
-    ["/workspace/bpjs", "BPJS / JKN"], ["/workspace/laporan", "Laporan Keuangan"],
+    ["/master", "Paket & Daftar Tarif"], ["/invoices", "Asuransi"],
+    ["/invoices", "BPJS / JKN"], ["/reports", "Laporan Keuangan"],
   ]),
   patient: asItems([
     ["/dashboard", "Dashboard Pasien"], ["/portal", "Pesan Layanan"],
@@ -57,7 +57,7 @@ const menus: Record<ClinicalPersona, Item[]> = {
     ["/dashboard", "Dashboard"], ["/hah", "Hospital at Home"],
     ["/findings", "Temuan"], ["/audits", "Audit & Checklist"],
     ["/risks", "Risiko"], ["/capa", "CAPA"], ["/documents", "Dokumen"],
-    ["/referrals", "Rujukan"], ["/workspace/laporan", "Laporan"],
+    ["/referrals", "Rujukan"], ["/reports", "Laporan"],
   ]),
 };
 

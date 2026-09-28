@@ -28,3 +28,49 @@ describe('BillingService', () => {
     });
   });
 });
+
+describe('BillingService coverage', () => {
+  it('menolak pertanggungan melebihi total tagihan', async () => {
+    const prisma: any = {
+      invoice: { findUnique: jest.fn().mockResolvedValue({ id: 'inv-1', total: 100_000 }) },
+    };
+    const service = new BillingService(prisma, {} as any, {} as any);
+    await expect(
+      service.updateCoverage(
+        'inv-1',
+        {
+          payerType: 'BPJS_JKN' as any,
+          claimStatus: 'APPROVED' as any,
+          coveredAmount: 120_000,
+        },
+        'finance-1',
+      ),
+    ).rejects.toThrow(/melebihi total/i);
+  });
+
+  it('menyimpan klaim dan audit trail', async () => {
+    const prisma: any = {
+      invoice: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'inv-1', total: 100_000, status: 'UNPAID' }),
+        update: jest.fn().mockResolvedValue({ id: 'inv-1', coveredAmount: 80_000 }),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const service = new BillingService(prisma, {} as any, {} as any);
+    await service.updateCoverage(
+      'inv-1',
+      {
+        payerType: 'PRIVATE_INSURANCE' as any,
+        insurerName: 'Penjamin Uji',
+        claimNumber: 'CLM-1',
+        claimStatus: 'APPROVED' as any,
+        coveredAmount: 80_000,
+      },
+      'finance-1',
+    );
+    expect(prisma.invoice.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ coveredAmount: 80_000 }) }),
+    );
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});

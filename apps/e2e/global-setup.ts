@@ -64,6 +64,26 @@ const raceUser = await prisma.user.upsert({
   },
 });
 await prisma.authSession.deleteMany({ where: { userId: raceUser.id } });
+
+  for (const role of [Role.DOCTOR, Role.NURSE, Role.FINANCE, Role.PATIENT, Role.CAREGIVER]) {
+    const roleUser = await prisma.user.upsert({
+      where: { email: `ci-${role.toLowerCase()}@vitacare.invalid` },
+      update: {
+        name: `CI ${role}`,
+        passwordHash: primary.passwordHash,
+        role,
+        isActive: true,
+        twoFaSecret: null,
+      },
+      create: {
+        email: `ci-${role.toLowerCase()}@vitacare.invalid`,
+        name: `CI ${role}`,
+        passwordHash: primary.passwordHash,
+        role,
+      },
+    });
+    await prisma.authSession.deleteMany({ where: { userId: roleUser.id } });
+  }
   await prisma.$disconnect();
 
   const context = await request.newContext({ baseURL: apiUrl });

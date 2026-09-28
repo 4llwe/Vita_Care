@@ -1,10 +1,11 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { UpdateCoverageDto } from './dto/update-coverage.dto';
 
 @Controller()
 export class BillingController {
@@ -22,6 +23,17 @@ export class BillingController {
   @Roles('PATIENT', 'FINANCE', 'COORDINATOR', 'SUPER_ADMIN')
   pay(@Param('id') id: string, @CurrentUser() user: { id: string; role: string }) {
     return this.billing.pay(id, user);
+  }
+
+  @Patch('invoices/:id/coverage')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('FINANCE', 'COORDINATOR', 'SUPER_ADMIN')
+  updateCoverage(
+    @Param('id') id: string,
+    @Body() dto: UpdateCoverageDto,
+    @CurrentUser() actor: { id: string },
+  ) {
+    return this.billing.updateCoverage(id, dto, actor.id);
   }
 
   @Get('invoices/me')

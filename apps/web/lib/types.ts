@@ -116,6 +116,12 @@ export type Invoice = {
   patientName: string;
   total: number;
   status: string;
+  payerType: "SELF_PAY" | "PRIVATE_INSURANCE" | "BPJS_JKN" | "CORPORATE";
+  insurerName?: string | null;
+  memberNumber?: string | null;
+  claimNumber?: string | null;
+  claimStatus: string;
+  coveredAmount: number;
   issuedAt: string;
   paidAt?: string | null;
 };
