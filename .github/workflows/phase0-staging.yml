@@ -32,9 +32,16 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U vitacare -d vitacare_ci"
           --health-interval 10s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 10
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://vitacare:vitacare_ci_only@localhost:5432/vitacare_ci
+      REDIS_URL: redis://127.0.0.1:6379
       JWT_ACCESS_SECRET: "ci-access-secret-0123456789abcdef"
       JWT_REFRESH_SECRET: "ci-refresh-secret-0123456789abcdef"
       REFRESH_TOKEN_PEPPER: "ci-refresh-token-pepper-0123456789abcdef"
@@ -89,6 +96,7 @@ jobs:
       - name: Start API and web
         run: |
           node apps/api/dist/main.js > release-evidence/api.log 2>&1 & echo $! > /tmp/vc-api.pid
+          node apps/api/dist/worker.js > release-evidence/worker.log 2>&1 & echo $! > /tmp/vc-worker.pid
           pnpm --filter web start > release-evidence/web.log 2>&1 & echo $! > /tmp/vc-web.pid
           for i in $(seq 1 60); do
             curl -fsS http://127.0.0.1:3001/api/health/ready >/dev/null && curl -fsS http://127.0.0.1:3000 >/dev/null && exit 0
