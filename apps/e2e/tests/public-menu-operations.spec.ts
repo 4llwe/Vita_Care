@@ -24,3 +24,23 @@ test("service request form creates ticket", async ({ page }) => {
   await page.getByRole("button", { name: /Kirim dan buat tiket/ }).click();
   await expect(page.getByRole("status")).toContainText(/Nomor tiket/);
 });
+
+test("service pages present specific scope and safety guidance", async ({ page }) => {
+  await page.goto("/informasi/layanan/perawatan-luka");
+  await expect(page.getByRole("heading", { name: "Perawatan Luka" })).toBeVisible();
+  await expect(page.getByText(/asesmen, tindakan sesuai kompetensi/i)).toBeVisible();
+  await expect(page.getByText(/kondisi gawat darurat/i)).toBeVisible();
+});
+
+test("homepage exposes verified featured service routes", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("Layanan unggulan", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Kunjungan Dokter/i })).toHaveAttribute(
+    "href",
+    "/informasi/layanan/kunjungan-dokter",
+  );
+  await expect(page.getByRole("link", { name: /Telekonsultasi/i })).toHaveAttribute(
+    "href",
+    "/informasi/layanan/telekonsultasi",
+  );
+});
