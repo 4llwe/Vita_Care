@@ -1632,6 +1632,7 @@ export default function EpisodePage() {
                   !openAlerts &&
                   !pendingDiagnostics &&
                   !criticalResults &&
+                  !!d.dischargeChecklist &&
                   evaluationCurrent;
                 return (
                   <aside
@@ -1649,6 +1650,8 @@ export default function EpisodePage() {
                             `${pendingDiagnostics} diagnostik berjalan`,
                           criticalResults &&
                             `${criticalResults} hasil kritis belum diakui`,
+                          !d.dischargeChecklist &&
+                            "checklist transisi pulang belum selesai",
                           !evaluationCurrent && "evaluasi DISCHARGE_READY belum berlaku",
                         ]
                           .filter(Boolean)
@@ -1699,6 +1702,53 @@ export default function EpisodePage() {
                 >
                   Minta transfer
                 </button>
+              </form>
+              <form
+                className="space-y-3 border-t pt-4"
+                onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  submit(`/hah/episodes/${id}/discharge-checklist`, {
+                    medicationReconciled:
+                      f.get("medicationReconciled") === "on",
+                    medicationSummary: f.get("dischargeMedicationSummary"),
+                    pendingResultsReviewed:
+                      f.get("pendingResultsReviewed") === "on",
+                    pendingResultsPlan: f.get("pendingResultsPlan"),
+                    equipmentReturnPlanned:
+                      f.get("equipmentReturnPlanned") === "on",
+                    equipmentReturnPlan: f.get("equipmentReturnPlan"),
+                    followUpBooked: f.get("followUpBooked") === "on",
+                    followUpAt: new Date(
+                      String(f.get("dischargeFollowUpAt")),
+                    ).toISOString(),
+                    followUpProvider: f.get("followUpProvider"),
+                    redFlagsReviewed: f.get("redFlagsReviewed") === "on",
+                    caregiverTeachBackPassed:
+                      f.get("caregiverTeachBackPassed") === "on",
+                    documentsDelivered:
+                      f.get("documentsDelivered") === "on",
+                    contactInstructions: f.get("contactInstructions"),
+                  });
+                }}
+              >
+                <h3 className="font-bold">Checklist transisi pulang</h3>
+                <label className="flex gap-2"><input name="medicationReconciled" type="checkbox" required /> Rekonsiliasi obat selesai</label>
+                <Field label="Ringkasan obat saat pulang"><textarea name="dischargeMedicationSummary" minLength={10} required className={input} /></Field>
+                <label className="flex gap-2"><input name="pendingResultsReviewed" type="checkbox" required /> Hasil tertunda telah ditinjau</label>
+                <Field label="Rencana hasil tertunda"><textarea name="pendingResultsPlan" required className={input} /></Field>
+                <label className="flex gap-2"><input name="equipmentReturnPlanned" type="checkbox" required /> Pengembalian alat direncanakan</label>
+                <Field label="Rencana pengembalian alat"><textarea name="equipmentReturnPlan" required className={input} /></Field>
+                <label className="flex gap-2"><input name="followUpBooked" type="checkbox" required /> Tindak lanjut telah dijadwalkan</label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Waktu tindak lanjut"><input name="dischargeFollowUpAt" type="datetime-local" required className={input} /></Field>
+                  <Field label="Pemberi layanan tindak lanjut"><input name="followUpProvider" required className={input} /></Field>
+                </div>
+                <label className="flex gap-2"><input name="redFlagsReviewed" type="checkbox" required /> Tanda bahaya telah dijelaskan</label>
+                <label className="flex gap-2"><input name="caregiverTeachBackPassed" type="checkbox" required /> Teach-back pasien/caregiver berhasil</label>
+                <label className="flex gap-2"><input name="documentsDelivered" type="checkbox" required /> Dokumen pulang telah diserahkan</label>
+                <Field label="Instruksi kontak dan bantuan"><textarea name="contactInstructions" minLength={10} required className={input} /></Field>
+                <button className={btn} disabled={busy}>Selesaikan checklist discharge</button>
               </form>
               <form
                 className="space-y-3 border-t pt-4"

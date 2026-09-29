@@ -28,6 +28,7 @@ describe("HaHService discharge safety", () => {
       haHDiagnosticOrder: {
         count: jest.fn().mockResolvedValueOnce(1).mockResolvedValueOnce(1),
       },
+      haHDischargeChecklist: { findUnique: jest.fn().mockResolvedValue(null) },
     };
 
     const readiness = await serviceWith(prisma).dischargeReadiness("episode-1");
@@ -38,6 +39,7 @@ describe("HaHService discharge safety", () => {
         expect.stringMatching(/2 alert klinis/i),
         expect.stringMatching(/1 pemeriksaan diagnostik/i),
         expect.stringMatching(/1 hasil kritis/i),
+        expect.stringMatching(/checklist transisi pulang/i),
       ]),
     );
   });
@@ -51,6 +53,9 @@ describe("HaHService discharge safety", () => {
       },
       clinicalAlert: { count: jest.fn().mockResolvedValue(0) },
       haHDiagnosticOrder: { count: jest.fn().mockResolvedValue(0) },
+      haHDischargeChecklist: {
+        findUnique: jest.fn().mockResolvedValue({ id: "checklist-1" }),
+      },
       haHClinicalEvaluation: { findFirst: jest.fn().mockResolvedValue(null) },
       haHCarePlan: {
         findUnique: jest
@@ -71,6 +76,48 @@ describe("HaHService discharge safety", () => {
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.haHEpisode.update).toBeUndefined();
+  });
+
+  it("menyimpan checklist lengkap dan mencatat audit", async () => {
+    const checklist = {
+      id: "checklist-1",
+      episodeId: "episode-1",
+      followUpAt: new Date("2030-01-01T08:00:00Z"),
+      followUpProvider: "Klinik penyakit dalam",
+    };
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      haHDischargeChecklist: {
+        upsert: jest.fn().mockResolvedValue(checklist),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const result = await serviceWith(prisma).upsertDischargeChecklist(
+      "episode-1",
+      {
+        medicationReconciled: true,
+        medicationSummary: "Daftar obat pulang telah diverifikasi dokter.",
+        pendingResultsReviewed: true,
+        pendingResultsPlan: "Tidak ada hasil tertunda",
+        equipmentReturnPlanned: true,
+        equipmentReturnPlan: "Dijemput supplier besok",
+        followUpBooked: true,
+        followUpAt: "2030-01-01T08:00:00Z",
+        followUpProvider: "Klinik penyakit dalam",
+        redFlagsReviewed: true,
+        caregiverTeachBackPassed: true,
+        documentsDelivered: true,
+        contactInstructions: "Hubungi tim HaH bila muncul tanda bahaya.",
+      },
+      "nurse-1",
+    );
+    expect(result.id).toBe("checklist-1");
+    expect(prisma.auditLog.create).toHaveBeenCalled();
   });
 });
 
