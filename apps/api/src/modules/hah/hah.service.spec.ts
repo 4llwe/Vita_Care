@@ -349,6 +349,77 @@ describe("HaHService allergy and medication reconciliation safety", () => {
   });
 });
 
+describe("HaHService patient safety incident workflow", () => {
+  it("membuat alert kritis dan notifikasi untuk insiden berat", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          code: "HAH-001",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      haHSafetyIncident: {
+        create: jest.fn().mockResolvedValue({
+          id: "incident-1",
+          category: "FALL",
+          severity: "SEVERE",
+          description: "Pasien jatuh saat berpindah dari tempat tidur",
+        }),
+      },
+      clinicalAlert: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const notify = { enqueue: jest.fn().mockResolvedValue({}) };
+    await new HaHService(prisma, notify as any).reportSafetyIncident(
+      "episode-1",
+      {
+        category: "FALL",
+        severity: "SEVERE",
+        occurredAt: "2026-09-29T08:00:00.000Z",
+        description: "Pasien jatuh saat berpindah dari tempat tidur",
+        immediateAction: "Pasien diamankan dan dokter dihubungi",
+        patientCondition: "Sadar, mengeluh nyeri panggul",
+        patientFamilyInformed: true,
+      },
+      "nurse-1",
+    );
+    expect(prisma.clinicalAlert.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          severity: "CRITICAL",
+        }),
+      }),
+    );
+    expect(notify.enqueue).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("mewajibkan akar masalah dan tindakan korektif sebelum resolusi", async () => {
+    const prisma: any = {
+      haHSafetyIncident: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "incident-1",
+          episodeId: "episode-1",
+          status: "UNDER_REVIEW",
+          rootCause: null,
+          correctiveAction: null,
+        }),
+      },
+    };
+    await expect(
+      new HaHService(prisma, {} as any).reviewSafetyIncident(
+        "incident-1",
+        {
+          status: "RESOLVED",
+          reviewSummary: "Review telah dilakukan bersama tim",
+        },
+        "doctor-1",
+      ),
+    ).rejects.toThrow(/tindakan korektif wajib/i);
+  });
+});
+
 describe("HaHService medication adherence", () => {
   it("memperbarui dosis terjadwal tanpa membuat catatan duplikat", async () => {
     const planned = {

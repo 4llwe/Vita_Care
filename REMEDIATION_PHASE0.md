@@ -216,5 +216,11 @@
 - Added episode-scoped medication reconciliation for admission, routine review, transfer, and discharge, including information sources, home medicines, discrepancies, resolution actions, and patient/caregiver involvement.
 - Allergy entries and completed reconciliations are displayed in the existing medication workspace and written to the clinical audit trail.
 
+## Phase 2.21 — patient-safety incident and near-miss workflow
+- Added episode-scoped reporting for medication, fall, equipment, care-delivery, privacy, and other incidents without replacing the existing alert, risk, or audit modules.
+- Captures occurrence time, harm severity, factual description, immediate action, patient condition, witnesses, and whether the patient/family was informed.
+- Moderate, severe, and sentinel incidents create time-bound clinical alerts and team notifications for immediate review.
+- Review follows controlled states and cannot be resolved without documented root cause and corrective action; reporting and every review transition remain in the clinical audit trail.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

@@ -16,6 +16,8 @@ import {
   HaHEligibilityDecision,
   HaHEpisodeStatus,
   HaHAllergySeverity,
+  HaHIncidentSeverity,
+  HaHIncidentStatus,
   HaHTransferStatus,
   HaHVisitStatus,
   MedicationOrderStatus,
@@ -52,6 +54,8 @@ import {
   CreateMedicationOrderDto,
   RecordAllergyDto,
   CreateMedicationReconciliationDto,
+  CreateSafetyIncidentDto,
+  ReviewSafetyIncidentDto,
   CreateMedicationFulfillmentDto,
   CreatePatientDto,
   CreateVisitDto,
@@ -1546,6 +1550,134 @@ export class HaHService {
       },
     );
     return reconciliation;
+  }
+
+  async reportSafetyIncident(
+    episodeId: string,
+    dto: CreateSafetyIncidentDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    const occurredAt = new Date(dto.occurredAt);
+    if (occurredAt > new Date())
+      throw new BadRequestException("Waktu kejadian tidak boleh di masa depan");
+    const incident = await this.prisma.haHSafetyIncident.create({
+      data: {
+        episodeId,
+        category: dto.category,
+        severity: dto.severity as HaHIncidentSeverity,
+        occurredAt,
+        description: dto.description.trim(),
+        immediateAction: dto.immediateAction.trim(),
+        patientCondition: dto.patientCondition.trim(),
+        witnesses: dto.witnesses?.trim() || null,
+        patientFamilyInformed: dto.patientFamilyInformed,
+        reportedById: actorId,
+      },
+    });
+    if (
+      (
+        [
+          HaHIncidentSeverity.MODERATE,
+          HaHIncidentSeverity.SEVERE,
+          HaHIncidentSeverity.SENTINEL,
+        ] as HaHIncidentSeverity[]
+      ).includes(incident.severity)
+    ) {
+      const critical = (
+        [
+          HaHIncidentSeverity.SEVERE,
+          HaHIncidentSeverity.SENTINEL,
+        ] as HaHIncidentSeverity[]
+      ).includes(incident.severity);
+      await this.prisma.clinicalAlert.create({
+        data: {
+          episodeId,
+          severity: critical
+            ? ClinicalAlertSeverity.CRITICAL
+            : ClinicalAlertSeverity.HIGH,
+          trigger: `Insiden keselamatan ${incident.category} (${incident.severity})`,
+          responseDueAt: new Date(Date.now() + (critical ? 5 : 30) * 60_000),
+        },
+      });
+      await this.notify.enqueue({
+        channel: "in-app",
+        title: `Insiden keselamatan ${incident.severity}`,
+        body: `${episode.code}: ${incident.description.slice(0, 180)}`,
+      });
+    }
+    await this.auditEpisodeEvent(actorId, "SAFETY_INCIDENT_REPORTED", episodeId, {
+      incidentId: incident.id,
+      category: incident.category,
+      severity: incident.severity,
+    });
+    return incident;
+  }
+
+  async reviewSafetyIncident(
+    incidentId: string,
+    dto: ReviewSafetyIncidentDto,
+    actorId: string,
+  ) {
+    const incident = await this.prisma.haHSafetyIncident.findUnique({
+      where: { id: incidentId },
+    });
+    if (!incident) throw new NotFoundException("Insiden keselamatan tidak ditemukan");
+    const next = dto.status as HaHIncidentStatus;
+    const transitions: Record<HaHIncidentStatus, HaHIncidentStatus[]> = {
+      [HaHIncidentStatus.REPORTED]: [
+        HaHIncidentStatus.UNDER_REVIEW,
+        HaHIncidentStatus.ACTION_REQUIRED,
+      ],
+      [HaHIncidentStatus.UNDER_REVIEW]: [
+        HaHIncidentStatus.ACTION_REQUIRED,
+        HaHIncidentStatus.RESOLVED,
+      ],
+      [HaHIncidentStatus.ACTION_REQUIRED]: [
+        HaHIncidentStatus.UNDER_REVIEW,
+        HaHIncidentStatus.RESOLVED,
+      ],
+      [HaHIncidentStatus.RESOLVED]: [],
+    };
+    if (!transitions[incident.status].includes(next))
+      throw new BadRequestException(
+        `Transisi insiden ${incident.status} → ${next} tidak diizinkan`,
+      );
+    if (
+      (
+        [
+          HaHIncidentStatus.ACTION_REQUIRED,
+          HaHIncidentStatus.RESOLVED,
+        ] as HaHIncidentStatus[]
+      ).includes(next) &&
+      !dto.correctiveAction?.trim()
+    )
+      throw new BadRequestException("Tindakan korektif wajib dicatat");
+    if (next === HaHIncidentStatus.RESOLVED && !dto.rootCause?.trim())
+      throw new BadRequestException("Akar masalah wajib dicatat sebelum resolusi");
+    const now = new Date();
+    const updated = await this.prisma.haHSafetyIncident.update({
+      where: { id: incidentId },
+      data: {
+        status: next,
+        reviewSummary: dto.reviewSummary.trim(),
+        rootCause: dto.rootCause?.trim() || incident.rootCause,
+        correctiveAction:
+          dto.correctiveAction?.trim() || incident.correctiveAction,
+        reviewedById: actorId,
+        reviewedAt: now,
+        ...(next === HaHIncidentStatus.RESOLVED
+          ? { resolvedById: actorId, resolvedAt: now }
+          : {}),
+      },
+    });
+    await this.auditEpisodeEvent(
+      actorId,
+      `SAFETY_INCIDENT_${next}`,
+      incident.episodeId,
+      { incidentId },
+    );
+    return updated;
   }
 
   async updateMedicationStatus(id: string, dto: UpdateMedicationStatusDto) {
@@ -3522,6 +3654,10 @@ export class HaHService {
         medicationReconciliations: {
           orderBy: { completedAt: "desc" },
           take: 50,
+        },
+        safetyIncidents: {
+          orderBy: { reportedAt: "desc" },
+          take: 100,
         },
         transfers: { orderBy: { requestedAt: "desc" } },
         diagnosticOrders: { orderBy: { orderedAt: "desc" } },

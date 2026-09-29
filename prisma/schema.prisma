@@ -138,6 +138,21 @@ enum HaHAllergySeverity {
   UNKNOWN
 }
 
+enum HaHIncidentSeverity {
+  NO_HARM
+  LOW
+  MODERATE
+  SEVERE
+  SENTINEL
+}
+
+enum HaHIncidentStatus {
+  REPORTED
+  UNDER_REVIEW
+  ACTION_REQUIRED
+  RESOLVED
+}
+
 model User {
   id          String   @id @default(cuid())
   email       String   @unique
@@ -917,6 +932,7 @@ model HaHEpisode {
   visits                HaHVisit[]
   medicationOrders      MedicationOrder[]
   medicationReconciliations HaHMedicationReconciliation[]
+  safetyIncidents       HaHSafetyIncident[]
   transfers             HaHTransfer[]
   diagnosticOrders      HaHDiagnosticOrder[]
   equipmentAssignments  HaHEquipmentAssignment[]
@@ -973,6 +989,33 @@ model HaHMedicationReconciliation {
   completedAt                DateTime   @default(now())
 
   @@index([episodeId, completedAt])
+}
+
+model HaHSafetyIncident {
+  id                    String              @id @default(cuid())
+  episodeId             String
+  episode               HaHEpisode          @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  category              String
+  severity              HaHIncidentSeverity
+  status                HaHIncidentStatus   @default(REPORTED)
+  occurredAt            DateTime
+  description           String
+  immediateAction       String
+  patientCondition      String
+  witnesses             String?
+  reportedById          String
+  reportedAt            DateTime            @default(now())
+  reviewedById          String?
+  reviewedAt            DateTime?
+  reviewSummary         String?
+  rootCause             String?
+  correctiveAction      String?
+  patientFamilyInformed Boolean             @default(false)
+  resolvedById          String?
+  resolvedAt            DateTime?
+
+  @@index([episodeId, occurredAt])
+  @@index([status, severity, reportedAt])
 }
 
 model HaHPostDischargeFollowUp {
