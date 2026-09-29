@@ -8,6 +8,7 @@ rand(){ openssl rand -base64 48 | tr -d '\n'; }
 replace(){ key="$1"; value="$2"; sed -i "s|^${key}=.*|${key}=${value}|" "$out"; }
 replace JWT_ACCESS_SECRET "$(rand)"
 replace JWT_REFRESH_SECRET "$(rand)"
+replace REFRESH_TOKEN_PEPPER "$(rand)"
 replace ENCRYPTION_KEY "$(rand)"
 replace BACKUP_ENCRYPTION_KEY "$(rand)"
 replace POSTGRES_PASSWORD "$(rand)"

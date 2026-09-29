@@ -228,5 +228,11 @@
 - Added a traceability matrix from the agreed requirements to the existing implementation and clearly separated automated evidence from operator sign-off.
 - Removed the remaining pre-existing web lint warning so the release gate reports a clean lint result.
 
+## Phase 3.1 — production configuration hardening
+- Added a secret-safe production environment validator covering required keys, HTTPS endpoints, independent secret strength, E.164 emergency contacts, email syntax, payment production mode, and placeholder removal.
+- Fixed the production template and generator so the refresh-token pepper and public API URL cannot be omitted, and every generated security secret is independent.
+- Integrated environment-template validation into CI and full environment validation into preflight/predeploy checks without printing credentials.
+- Pinned Netlify installation to the committed lockfile and added HSTS, CSP, frame protection, and cross-origin opener security headers.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.
