@@ -40,6 +40,7 @@ import {
   CreateVisitDto,
   CreateWoundAssessmentDto,
   CreateFunctionalAssessmentDto,
+  CreateNutritionAssessmentDto,
   DiagnosticResultDto,
   DischargeDto,
   EndCareAssignmentDto,
@@ -307,6 +308,30 @@ export class HaHController {
   )
   functionalAssessments(@Param("id") id: string) {
     return this.hah.listFunctionalAssessments(id);
+  }
+
+  @Get("episodes/:id/nutrition-assessments")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  nutritionAssessments(@Param("id") id: string) {
+    return this.hah.listNutritionAssessments(id);
+  }
+
+  @Post("episodes/:id/nutrition-assessments")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "SUPER_ADMIN")
+  createNutritionAssessment(
+    @Param("id") id: string,
+    @Body() dto: CreateNutritionAssessmentDto,
+    @CurrentUser() actor: { id: string },
+  ) {
+    return this.hah.createNutritionAssessment(id, dto, actor.id);
   }
 
   @Post("episodes/:id/functional-assessments")
