@@ -19,6 +19,7 @@ import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/ac
 import { NotificationService } from "../notification/notification.service";
 import {
   AdministerMedicationDto,
+  AssignCareTeamDto,
   ApproveClinicalProtocolDto,
   BreakGlassAccessDto,
   AdmitEpisodeDto,
@@ -35,6 +36,7 @@ import {
   CreateVisitDto,
   DiagnosticResultDto,
   DischargeDto,
+  EndCareAssignmentDto,
   GrantCaregiverAccessDto,
   RecordObservationDto,
   SendClinicalMessageDto,
@@ -331,7 +333,9 @@ export class HaHService {
               create: {
                 healthWorkerId: physician.id,
                 type: CareAssignmentType.PRIMARY_CLINICIAN,
+                responsibility: "Dokter penanggung jawab utama",
                 startsAt: new Date(),
+                assignedById: actorId,
               },
             }
           : undefined,
@@ -1144,6 +1148,141 @@ export class HaHService {
     });
   }
 
+  listCareTeam(episodeId: string) {
+    return this.prisma.careAssignment.findMany({
+      where: { episodeId },
+      include: {
+        healthWorker: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } },
+          },
+        },
+      },
+      orderBy: [{ isActive: "desc" }, { startsAt: "asc" }],
+    });
+  }
+
+  async assignCareTeam(
+    episodeId: string,
+    dto: AssignCareTeamDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (
+      !(
+        [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException("Tim hanya dapat ditugaskan pada episode aktif");
+    const worker = await this.prisma.healthWorker.findUnique({
+      where: { id: dto.healthWorkerId },
+      include: { user: true },
+    });
+    if (!worker || !worker.isActive || worker.licenseValidUntil <= new Date())
+      throw new BadRequestException(
+        "Tenaga kesehatan tidak aktif atau lisensinya kedaluwarsa",
+      );
+    const startsAt = new Date(dto.startsAt);
+    const endsAt = dto.endsAt ? new Date(dto.endsAt) : undefined;
+    if (endsAt && endsAt <= startsAt)
+      throw new BadRequestException("Akhir penugasan harus setelah waktu mulai");
+    const type = dto.type as CareAssignmentType;
+    if (type === CareAssignmentType.PRIMARY_CLINICIAN && !worker.userId)
+      throw new BadRequestException(
+        "Dokter utama harus terhubung dengan akun pengguna",
+      );
+    const assignment = await this.prisma.$transaction(async (tx) => {
+      await tx.careAssignment.updateMany({
+        where: {
+          episodeId,
+          type,
+          isActive: true,
+          healthWorkerId: { not: worker.id },
+        },
+        data: {
+          isActive: false,
+          endsAt: new Date(),
+          endedById: actorId,
+          endReason: "Digantikan melalui koordinasi tim",
+        },
+      });
+      const saved = await tx.careAssignment.upsert({
+        where: {
+          episodeId_healthWorkerId_type: {
+            episodeId,
+            healthWorkerId: worker.id,
+            type,
+          },
+        },
+        create: {
+          episodeId,
+          healthWorkerId: worker.id,
+          type,
+          responsibility: dto.responsibility,
+          startsAt,
+          endsAt,
+          assignedById: actorId,
+        },
+        update: {
+          responsibility: dto.responsibility,
+          startsAt,
+          endsAt: endsAt ?? null,
+          isActive: true,
+          assignedById: actorId,
+          endedById: null,
+          endReason: null,
+        },
+        include: { healthWorker: true },
+      });
+      if (type === CareAssignmentType.PRIMARY_CLINICIAN)
+        await tx.haHEpisode.update({
+          where: { id: episodeId },
+          data: { attendingPhysicianId: worker.userId! },
+        });
+      return saved;
+    });
+    await this.auditEpisodeEvent(actorId, "CARE_TEAM_ASSIGNED", episodeId, {
+      careAssignmentId: assignment.id,
+      healthWorkerId: assignment.healthWorkerId,
+      type: assignment.type,
+    });
+    return assignment;
+  }
+
+  async endCareAssignment(
+    assignmentId: string,
+    dto: EndCareAssignmentDto,
+    actorId: string,
+  ) {
+    const current = await this.prisma.careAssignment.findUnique({
+      where: { id: assignmentId },
+    });
+    if (!current?.episodeId)
+      throw new NotFoundException("Penugasan episode tidak ditemukan");
+    if (!current.isActive)
+      throw new BadRequestException("Penugasan sudah tidak aktif");
+    if (current.type === CareAssignmentType.PRIMARY_CLINICIAN)
+      throw new BadRequestException(
+        "Dokter utama harus diganti melalui penugasan baru, bukan diakhiri tanpa pengganti",
+      );
+    const assignment = await this.prisma.careAssignment.update({
+      where: { id: assignmentId },
+      data: {
+        isActive: false,
+        endsAt: new Date(),
+        endedById: actorId,
+        endReason: dto.reason,
+      },
+    });
+    await this.auditEpisodeEvent(
+      actorId,
+      "CARE_TEAM_ASSIGNMENT_ENDED",
+      current.episodeId,
+      { careAssignmentId: assignmentId, reason: dto.reason },
+    );
+    return assignment;
+  }
+
   async updateVisit(id: string, dto: UpdateVisitStatusDto) {
     const visit = await this.prisma.haHVisit.findUnique({ where: { id } });
     if (!visit) throw new NotFoundException("Kunjungan tidak ditemukan");
@@ -1474,6 +1613,14 @@ export class HaHService {
                 OR: [
                   { attendingPhysicianId: actor.id },
                   { visits: { some: { healthWorker: { userId: actor.id } } } },
+                  {
+                    careAssignments: {
+                      some: {
+                        isActive: true,
+                        healthWorker: { userId: actor.id },
+                      },
+                    },
+                  },
                 ],
               }
             : actor && (isPatient || isCaregiver)
@@ -1563,6 +1710,14 @@ export class HaHService {
                 OR: [
                   { attendingPhysicianId: actor.id },
                   { visits: { some: { healthWorker: { userId: actor.id } } } },
+                  {
+                    careAssignments: {
+                      some: {
+                        isActive: true,
+                        healthWorker: { userId: actor.id },
+                      },
+                    },
+                  },
                 ],
               }
             : actor && (isPatient || isCaregiver)
@@ -1601,6 +1756,18 @@ export class HaHService {
         carePlanRevisions: { orderBy: { version: "desc" }, take: 10 },
         clinicalEvaluations: { orderBy: { evaluatedAt: "desc" }, take: 20 },
         emergencyEvents: { orderBy: { createdAt: "desc" }, take: 20 },
+        careAssignments: {
+          include: {
+            healthWorker: {
+              include: {
+                user: {
+                  select: { id: true, name: true, email: true, role: true },
+                },
+              },
+            },
+          },
+          orderBy: [{ isActive: "desc" }, { startsAt: "asc" }],
+        },
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,

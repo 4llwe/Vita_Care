@@ -15,6 +15,7 @@ import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import {
   AdministerMedicationDto,
+  AssignCareTeamDto,
   ApproveClinicalProtocolDto,
   BreakGlassAccessDto,
   AdmitEpisodeDto,
@@ -31,6 +32,7 @@ import {
   CreateVisitDto,
   DiagnosticResultDto,
   DischargeDto,
+  EndCareAssignmentDto,
   GrantCaregiverAccessDto,
   RecordObservationDto,
   ResolveAlertDto,
@@ -243,6 +245,40 @@ export class HaHController {
   @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
   visit(@Param("id") id: string, @Body() dto: CreateVisitDto) {
     return this.hah.createVisit(id, dto);
+  }
+
+  @Get("episodes/:id/care-team")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  careTeam(@Param("id") id: string) {
+    return this.hah.listCareTeam(id);
+  }
+
+  @Post("episodes/:id/care-team")
+  @Roles("COORDINATOR", "SUPER_ADMIN")
+  assignCareTeam(
+    @Param("id") id: string,
+    @Body() dto: AssignCareTeamDto,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.assignCareTeam(id, dto, u.id);
+  }
+
+  @Patch("care-assignments/:id/end")
+  @Roles("COORDINATOR", "SUPER_ADMIN")
+  endCareAssignment(
+    @Param("id") id: string,
+    @Body() dto: EndCareAssignmentDto,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.endCareAssignment(id, dto, u.id);
   }
 
   @Patch("visits/:id/status")

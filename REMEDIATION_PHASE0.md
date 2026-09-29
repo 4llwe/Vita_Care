@@ -108,5 +108,14 @@
 - Consent requires a timestamp, named consent giver, mandatory summary scope, and a valid optional expiration.
 - Users with both Patient and Caregiver roles retain full access to their own record while receiving scoped access to another patient's record.
 
+## Phase 2.4 — multidisciplinary care-team coordination
+- Operationalized the existing canonical CareAssignment model for Hospital at Home episodes instead of introducing a parallel staffing system.
+- Coordinators can assign or replace the primary clinician and care coordinator with documented responsibilities and assignment periods.
+- Reassignment ends the previous assignment transactionally, updates the attending physician when applicable, and writes an audit record.
+- Active care-team membership now grants episode access alongside attending-physician and scheduled-visit access.
+- Expired licenses and inactive health-worker profiles cannot be assigned.
+- A primary clinician cannot be removed without assigning a replacement, preserving clinical accountability.
+- The episode workspace shows active and historical team assignments and allows authorized coordinators to end non-primary assignments with a reason.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

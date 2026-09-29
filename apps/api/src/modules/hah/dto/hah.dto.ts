@@ -174,6 +174,18 @@ export class UpdateMedicationStatusDto {
   @IsIn(["ACTIVE", "HELD", "COMPLETED", "CANCELLED"]) status!: string;
 }
 
+export class AssignCareTeamDto {
+  @IsString() healthWorkerId!: string;
+  @IsIn(["PRIMARY_CLINICIAN", "CARE_COORDINATOR"]) type!: string;
+  @IsString() @MinLength(5) responsibility!: string;
+  @IsDateString() startsAt!: string;
+  @IsOptional() @IsDateString() endsAt?: string;
+}
+
+export class EndCareAssignmentDto {
+  @IsString() @MinLength(5) reason!: string;
+}
+
 export class CreateVisitDto {
   @IsString() healthWorkerId!: string;
   @IsString() visitType!: string;

@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { api } from "../../../../lib/api";
 import { getToken } from "../../../../lib/auth";
+import { fetchMe, type Session } from "../../../../lib/session";
 import { ErrorBox, Loading } from "../../../../components/async-state";
 const input =
   "min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100";
@@ -44,6 +45,33 @@ export default function EpisodePage() {
   const [d, setD] = useState<any>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [workers, setWorkers] = useState<any[]>([]);
+  const [endReasons, setEndReasons] = useState<Record<string, string>>({});
+  const canManageTeam =
+    session &&
+    [session.role, ...(session.roles ?? [])].some((role) =>
+      ["COORDINATOR", "SUPER_ADMIN"].includes(role),
+    );
+  useEffect(() => {
+    fetchMe().then(setSession).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (!canManageTeam) return;
+    api<any[]>("/health-workers", { token })
+      .then((rows) =>
+        setWorkers(
+          rows.filter(
+            (worker) =>
+              worker.isActive &&
+              new Date(worker.licenseValidUntil) > new Date(),
+          ),
+        ),
+      )
+      .catch((x) =>
+        setError(x instanceof Error ? x.message : "Gagal memuat tenaga kesehatan"),
+      );
+  }, [canManageTeam, token]);
   async function load() {
     try {
       setD(await api(`/hah/episodes/${id}`, { token }));
@@ -94,6 +122,129 @@ export default function EpisodePage() {
       </header>
       {error && <ErrorBox message={error} />}
       <div className="grid gap-6 xl:grid-cols-2">
+        <Panel title="Tim perawatan">
+          <p className="text-sm text-slate-600">
+            Penugasan aktif menentukan siapa yang dapat mengakses dan
+            mengoordinasikan episode ini.
+          </p>
+          {canManageTeam && ["ADMITTED", "ACTIVE"].includes(d.status) ? (
+            <form
+              className="space-y-3 rounded-xl border bg-slate-50 p-4"
+              onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                event.preventDefault();
+                const form = new FormData(event.currentTarget);
+                submit(`/hah/episodes/${id}/care-team`, {
+                  healthWorkerId: form.get("healthWorkerId"),
+                  type: form.get("type"),
+                  responsibility: form.get("responsibility"),
+                  startsAt: new Date(String(form.get("startsAt"))).toISOString(),
+                  endsAt: form.get("endsAt")
+                    ? new Date(String(form.get("endsAt"))).toISOString()
+                    : undefined,
+                });
+              }}
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Tenaga kesehatan">
+                  <select name="healthWorkerId" required className={input}>
+                    <option value="">Pilih tenaga kesehatan</option>
+                    {workers.map((worker) => (
+                      <option key={worker.id} value={worker.id}>
+                        {worker.name} · {worker.profession} · {worker.zone}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Peran tim">
+                  <select name="type" className={input}>
+                    <option value="CARE_COORDINATOR">Koordinator perawatan</option>
+                    <option value="PRIMARY_CLINICIAN">Dokter utama</option>
+                  </select>
+                </Field>
+                <Field label="Mulai penugasan">
+                  <input
+                    name="startsAt"
+                    type="datetime-local"
+                    required
+                    className={input}
+                  />
+                </Field>
+                <Field label="Selesai (opsional)">
+                  <input name="endsAt" type="datetime-local" className={input} />
+                </Field>
+              </div>
+              <Field label="Tanggung jawab">
+                <textarea
+                  name="responsibility"
+                  minLength={5}
+                  required
+                  className={input}
+                />
+              </Field>
+              <button className={btn} disabled={busy}>
+                Simpan penugasan
+              </button>
+            </form>
+          ) : null}
+          <div className="space-y-2">
+            {d.careAssignments?.length ? (
+              d.careAssignments.map((assignment: any) => (
+                <article
+                  key={assignment.id}
+                  className={`rounded-xl border p-3 text-sm ${
+                    assignment.isActive ? "bg-emerald-50" : "bg-slate-50"
+                  }`}
+                >
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <div>
+                      <strong>{assignment.healthWorker.name}</strong>
+                      <p className="text-slate-600">
+                        {assignment.healthWorker.profession} ·{" "}
+                        {assignment.type.replaceAll("_", " ")}
+                      </p>
+                      <p className="mt-1">{assignment.responsibility ?? "—"}</p>
+                    </div>
+                    <span className="font-bold">
+                      {assignment.isActive ? "Aktif" : "Selesai"}
+                    </span>
+                  </div>
+                  {canManageTeam &&
+                  assignment.isActive &&
+                  assignment.type !== "PRIMARY_CLINICIAN" ? (
+                    <div className="mt-3 flex flex-col gap-2 border-t pt-3 sm:flex-row">
+                      <input
+                        value={endReasons[assignment.id] ?? ""}
+                        onChange={(event) =>
+                          setEndReasons((current) => ({
+                            ...current,
+                            [assignment.id]: event.target.value,
+                          }))
+                        }
+                        placeholder="Alasan mengakhiri penugasan"
+                        className="min-h-11 flex-1 rounded-lg border bg-white px-3"
+                      />
+                      <button
+                        disabled={(endReasons[assignment.id]?.length ?? 0) < 5}
+                        onClick={() =>
+                          patch(`/hah/care-assignments/${assignment.id}/end`, {
+                            reason: endReasons[assignment.id],
+                          })
+                        }
+                        className="min-h-11 rounded-lg border border-red-300 px-4 font-bold text-red-700 disabled:opacity-50"
+                      >
+                        Akhiri penugasan
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+              ))
+            ) : (
+              <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+                Tim perawatan belum ditetapkan.
+              </p>
+            )}
+          </div>
+        </Panel>
         {["SCREENING", "INELIGIBLE"].includes(d.status) && (
           <Panel title="Eligibility screening">
             <form

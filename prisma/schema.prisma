@@ -332,14 +332,19 @@ model CareAssignment {
   healthWorkerId String
   healthWorker   HealthWorker       @relation(fields: [healthWorkerId], references: [id])
   type           CareAssignmentType
+  responsibility String?
   startsAt       DateTime
   endsAt         DateTime?
   isActive       Boolean            @default(true)
+  assignedById   String?
+  endedById      String?
+  endReason      String?
   createdAt      DateTime           @default(now())
 
   @@unique([appointmentId, healthWorkerId, type])
   @@unique([episodeId, healthWorkerId, type])
   @@index([healthWorkerId, isActive, startsAt])
+  @@index([episodeId, isActive])
 }
 
 model MedicalRecord {
