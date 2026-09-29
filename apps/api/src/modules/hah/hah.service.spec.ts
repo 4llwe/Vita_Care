@@ -5,6 +5,7 @@ import {
   DiagnosticOrderStatus,
   HaHEpisodeStatus,
   PharmacyFulfillmentStatus,
+  WoundProgress,
 } from "@prisma/client";
 import { HaHService } from "./hah.service";
 
@@ -633,6 +634,52 @@ describe("HaHService pharmacy fulfillment workflow", () => {
       { id: "pharmacist-1", role: "HEALTH_WORKER", roles: ["HEALTH_WORKER"] } as any,
     );
     expect(result.status).toBe(PharmacyFulfillmentStatus.OUT_FOR_DELIVERY);
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});
+
+describe("HaHService wound-care workflow", () => {
+  it("membuat alert ketika luka memburuk", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          code: "HAH-001",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      haHWoundAssessment: {
+        create: jest.fn().mockResolvedValue({
+          id: "wound-1",
+          woundLabel: "Tumit kanan",
+          progress: WoundProgress.DETERIORATING,
+          infectionSigns: true,
+        }),
+      },
+      clinicalAlert: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const notify = { enqueue: jest.fn().mockResolvedValue({}) };
+    await new HaHService(prisma, notify as any).createWoundAssessment(
+      "episode-1",
+      {
+        woundLabel: "Tumit kanan",
+        location: "Tumit",
+        woundType: "Tekanan",
+        tissueDescription: "Slough meningkat",
+        exudate: "Sedang",
+        odor: true,
+        surroundingSkin: "Eritema",
+        painScore: 6,
+        infectionSigns: true,
+        progress: "DETERIORATING",
+        dressing: "Foam antimicrobial",
+        nextReviewAt: "2030-01-01T08:00:00Z",
+      },
+      "nurse-1",
+    );
+    expect(prisma.clinicalAlert.create).toHaveBeenCalled();
+    expect(notify.enqueue).toHaveBeenCalled();
     expect(prisma.auditLog.create).toHaveBeenCalled();
   });
 });

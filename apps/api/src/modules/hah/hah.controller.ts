@@ -38,6 +38,7 @@ import {
   CreateMedicationFulfillmentDto,
   CreatePatientDto,
   CreateVisitDto,
+  CreateWoundAssessmentDto,
   DiagnosticResultDto,
   DischargeDto,
   EndCareAssignmentDto,
@@ -277,6 +278,30 @@ export class HaHController {
   )
   medicationAdherence(@Param("id") id: string) {
     return this.hah.medicationAdherence(id);
+  }
+
+  @Get("episodes/:id/wounds")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  woundAssessments(@Param("id") id: string) {
+    return this.hah.listWoundAssessments(id);
+  }
+
+  @Post("episodes/:id/wounds")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "SUPER_ADMIN")
+  createWoundAssessment(
+    @Param("id") id: string,
+    @Body() dto: CreateWoundAssessmentDto,
+    @CurrentUser() actor: { id: string },
+  ) {
+    return this.hah.createWoundAssessment(id, dto, actor.id);
   }
 
   @Post("medications/:id/fulfillments")

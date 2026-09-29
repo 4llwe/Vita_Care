@@ -138,5 +138,11 @@
 - Added a responsive pharmacy workboard for staff, patients, and authorized caregivers with role-based actions and episode links.
 - Refill requests, approvals, dispensing progress, and delivery confirmation are written to the episode audit trail.
 
+## Phase 2.8 — structured wound-care workflow
+- Added longitudinal wound assessments to active Hospital at Home episodes without replacing clinical tasks or care plans.
+- Captures wound identity, location/type, dimensions, tissue, exudate, odor, surrounding skin, pain, cleansing, dressing, education, progress, and review schedule.
+- Deterioration or documented infection signs create a high-priority clinical alert and notify the care team; the system does not generate an automatic diagnosis.
+- Wound documentation is included in episode audit trails and follows existing episode access and caregiver care-plan consent.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

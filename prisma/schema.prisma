@@ -762,6 +762,13 @@ enum ClinicalTaskPriority {
   STAT
 }
 
+enum WoundProgress {
+  IMPROVING
+  STABLE
+  DETERIORATING
+  HEALED
+}
+
 enum ClinicalTaskCategory {
   ASSESSMENT
   VITALS
@@ -847,12 +854,42 @@ model HaHEpisode {
   clinicalEvaluations    HaHClinicalEvaluation[]
   emergencyEvents        HaHEmergencyEvent[]
   clinicalTasks          HaHClinicalTask[]
+  woundAssessments       HaHWoundAssessment[]
   messages               HaHClinicalMessage[]
   breakGlassAccesses     HaHBreakGlassAccess[]
   careAssignments       CareAssignment[]
 
   @@index([status, createdAt])
   @@index([patientId, createdAt])
+}
+
+model HaHWoundAssessment {
+  id                String        @id @default(cuid())
+  episodeId         String
+  episode           HaHEpisode    @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  woundLabel        String
+  location          String
+  woundType         String
+  lengthCm          Float?
+  widthCm           Float?
+  depthCm           Float?
+  tissueDescription String
+  exudate           String
+  odor              Boolean       @default(false)
+  surroundingSkin   String
+  painScore         Int
+  infectionSigns    Boolean       @default(false)
+  progress          WoundProgress
+  cleansing         String?
+  dressing          String
+  education         String?
+  nextReviewAt      DateTime
+  assessedById      String
+  assessedAt        DateTime      @default(now())
+  createdAt         DateTime      @default(now())
+
+  @@index([episodeId, woundLabel, assessedAt])
+  @@index([infectionSigns, progress, nextReviewAt])
 }
 
 model HaHEligibilityAssessment {
