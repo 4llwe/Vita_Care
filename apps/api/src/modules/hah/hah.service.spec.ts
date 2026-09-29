@@ -1,5 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
-import { HaHEpisodeStatus } from "@prisma/client";
+import { CareAssignmentType, HaHEpisodeStatus } from "@prisma/client";
 import { HaHService } from "./hah.service";
 
 describe("HaHService discharge safety", () => {
@@ -293,5 +293,79 @@ describe("HaHService caregiver privacy", () => {
     expect(visible.medicationOrders).toEqual([]);
     expect(visible.messages).toEqual([]);
     expect(visible.emergencyEvents).toEqual([]);
+  });
+});
+
+describe("HaHService care-team coordination", () => {
+  it("mengganti koordinator secara transaksional dan mencatat audit", async () => {
+    const assignment = {
+      id: "assignment-1",
+      episodeId: "episode-1",
+      healthWorkerId: "worker-1",
+      type: CareAssignmentType.CARE_COORDINATOR,
+    };
+    const tx: any = {
+      careAssignment: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        upsert: jest.fn().mockResolvedValue(assignment),
+      },
+      haHEpisode: { update: jest.fn() },
+    };
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      healthWorker: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "worker-1",
+          isActive: true,
+          licenseValidUntil: new Date("2030-01-01T00:00:00Z"),
+          userId: "coordinator-user",
+          user: { id: "coordinator-user" },
+        }),
+      },
+      $transaction: jest.fn((callback) => callback(tx)),
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+
+    const result = await new HaHService(prisma, {} as any).assignCareTeam(
+      "episode-1",
+      {
+        healthWorkerId: "worker-1",
+        type: "CARE_COORDINATOR",
+        responsibility: "Koordinasi kunjungan dan komunikasi keluarga",
+        startsAt: "2026-09-29T08:00:00Z",
+      },
+      "admin-1",
+    );
+
+    expect(result).toEqual(assignment);
+    expect(tx.careAssignment.updateMany).toHaveBeenCalled();
+    expect(tx.careAssignment.upsert).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("mencegah dokter utama diakhiri tanpa pengganti", async () => {
+    const prisma: any = {
+      careAssignment: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "assignment-1",
+          episodeId: "episode-1",
+          type: CareAssignmentType.PRIMARY_CLINICIAN,
+          isActive: true,
+        }),
+      },
+    };
+
+    await expect(
+      new HaHService(prisma, {} as any).endCareAssignment(
+        "assignment-1",
+        { reason: "Pergantian jadwal" },
+        "admin-1",
+      ),
+    ).rejects.toThrow(/diganti melalui penugasan baru/i);
   });
 });

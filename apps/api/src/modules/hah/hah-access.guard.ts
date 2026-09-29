@@ -77,6 +77,13 @@ export class HaHAccessGuard implements CanActivate {
           select: { episodeId: true },
         })
       )?.episodeId;
+    else if (path.includes("care-assignments/:id"))
+      episodeId = (
+        await this.prisma.careAssignment.findUnique({
+          where: { id },
+          select: { episodeId: true },
+        })
+      )?.episodeId ?? undefined;
     if (!episodeId) throw new ForbiddenException("Resource klinis tidak dapat diakses");
     const isClinical = actorHasAnyRole(user, CLINICAL_ROLES);
     const isPatient = actorHasAnyRole(user, ["PATIENT"]);
@@ -106,6 +113,14 @@ export class HaHAccessGuard implements CanActivate {
             OR: [
               { attendingPhysicianId: user.id },
               { visits: { some: { healthWorker: { userId: user.id } } } },
+              {
+                careAssignments: {
+                  some: {
+                    isActive: true,
+                    healthWorker: { userId: user.id },
+                  },
+                },
+              },
               {
                 breakGlassAccesses: {
                   some: {
