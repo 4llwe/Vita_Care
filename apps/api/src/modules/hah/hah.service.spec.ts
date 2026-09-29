@@ -4,6 +4,7 @@ import {
   ClinicalTaskStatus,
   DiagnosticOrderStatus,
   HaHEpisodeStatus,
+  HaHVisitStatus,
   PharmacyFulfillmentStatus,
   WoundProgress,
   FallRiskLevel,
@@ -1094,5 +1095,61 @@ describe("HaHService post-discharge follow-up workflow", () => {
       }),
     );
     expect(notify.enqueueClinical).toHaveBeenCalled();
+  });
+});
+
+describe("HaHService home visit execution workflow", () => {
+  it("mewajibkan verifikasi identitas saat kunjungan dimulai", async () => {
+    const prisma: any = {
+      haHVisit: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "visit-1",
+          episodeId: "episode-1",
+          status: HaHVisitStatus.EN_ROUTE,
+          healthWorker: { userId: "nurse-1" },
+          episode: { code: "HAH-001" },
+        }),
+      },
+    };
+    await expect(
+      new HaHService(prisma, {} as any).updateVisit(
+        "visit-1",
+        { status: "IN_PROGRESS", identityVerified: false },
+        { id: "nurse-1", role: "NURSE", roles: ["NURSE"] } as any,
+      ),
+    ).rejects.toThrow(/identitas pasien harus diverifikasi/i);
+  });
+
+  it("menyelesaikan kunjungan dengan dokumentasi dan audit", async () => {
+    const prisma: any = {
+      haHVisit: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "visit-1",
+          episodeId: "episode-1",
+          status: HaHVisitStatus.IN_PROGRESS,
+          healthWorker: { userId: "nurse-1" },
+          episode: { code: "HAH-001" },
+        }),
+        update: jest.fn().mockResolvedValue({
+          id: "visit-1",
+          status: HaHVisitStatus.COMPLETED,
+        }),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const result = await new HaHService(prisma, {} as any).updateVisit(
+      "visit-1",
+      {
+        status: "COMPLETED",
+        clinicalNote: "Tanda vital stabil",
+        interventions: "Perawatan luka dan edukasi",
+        patientResponse: "Toleransi baik",
+        nextPlan: "Review dua hari lagi",
+        handoverNote: "Pantau eksudat luka",
+      },
+      { id: "nurse-1", role: "NURSE", roles: ["NURSE"] } as any,
+    );
+    expect(result.status).toBe(HaHVisitStatus.COMPLETED);
+    expect(prisma.auditLog.create).toHaveBeenCalled();
   });
 });
