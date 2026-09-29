@@ -853,6 +853,63 @@ export default function EpisodePage() {
                 </div>
               ))}
             </Panel>
+            <Panel title="Fungsi, risiko jatuh & rehabilitasi">
+              <form
+                className="space-y-3"
+                onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  submit(`/hah/episodes/${id}/functional-assessments`, {
+                    mobilityLevel: f.get("mobilityLevel"),
+                    adlScore: Number(f.get("adlScore")),
+                    fallRisk: f.get("fallRisk"),
+                    fallsLast30Days: Number(f.get("fallsLast30Days")),
+                    gaitAid: f.get("gaitAid") || undefined,
+                    transferAbility: f.get("transferAbility"),
+                    enduranceNotes: f.get("enduranceNotes") || undefined,
+                    homeHazards: f.get("homeHazards") || undefined,
+                    rehabilitationGoals: f.get("rehabilitationGoals"),
+                    exercisePlan: f.get("exercisePlan"),
+                    caregiverTraining: f.get("caregiverTraining") || undefined,
+                    progress: f.get("functionalProgress"),
+                    nextReviewAt: new Date(
+                      String(f.get("functionalReviewAt")),
+                    ).toISOString(),
+                  });
+                }}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Tingkat mobilitas"><input name="mobilityLevel" required className={input} placeholder="Mandiri / bantuan 1 orang / bed rest" /></Field>
+                  <Field label="Skor ADL 0–100"><input name="adlScore" type="number" min="0" max="100" required className={input} /></Field>
+                  <Field label="Risiko jatuh">
+                    <select name="fallRisk" className={input}><option value="LOW">Rendah</option><option value="MODERATE">Sedang</option><option value="HIGH">Tinggi</option></select>
+                  </Field>
+                  <Field label="Jatuh dalam 30 hari"><input name="fallsLast30Days" type="number" min="0" max="30" defaultValue="0" required className={input} /></Field>
+                  <Field label="Alat bantu jalan"><input name="gaitAid" className={input} /></Field>
+                  <Field label="Kemampuan transfer"><input name="transferAbility" required className={input} /></Field>
+                </div>
+                <Field label="Daya tahan/aktivitas"><textarea name="enduranceNotes" className={input} /></Field>
+                <Field label="Bahaya di lingkungan rumah"><textarea name="homeHazards" className={input} /></Field>
+                <Field label="Tujuan rehabilitasi"><textarea name="rehabilitationGoals" required className={input} /></Field>
+                <Field label="Rencana latihan"><textarea name="exercisePlan" required className={input} /></Field>
+                <Field label="Pelatihan caregiver"><textarea name="caregiverTraining" className={input} /></Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Perkembangan">
+                    <select name="functionalProgress" className={input}><option value="IMPROVING">Membaik</option><option value="STABLE">Stabil</option><option value="DECLINING">Menurun</option><option value="GOAL_ACHIEVED">Target tercapai</option></select>
+                  </Field>
+                  <Field label="Review berikutnya"><input name="functionalReviewAt" type="datetime-local" required className={input} /></Field>
+                </div>
+                <button className={btn} disabled={busy}>Simpan asesmen fungsi</button>
+              </form>
+              {d.functionalAssessments?.map((a: any) => (
+                <div key={a.id} className={`rounded-xl border p-3 text-sm ${a.fallRisk === "HIGH" || a.progress === "DECLINING" ? "border-orange-300 bg-orange-50" : "bg-slate-50"}`}>
+                  <strong>{a.mobilityLevel}</strong> · ADL {a.adlScore}/100 · Risiko jatuh {a.fallRisk}
+                  <p className="mt-1">{a.progress} · {a.fallsLast30Days} kejadian jatuh/30 hari</p>
+                  <p className="mt-1"><b>Target:</b> {a.rehabilitationGoals}</p>
+                  <p className="mt-1 text-xs text-slate-500">Review {new Date(a.nextReviewAt).toLocaleString("id-ID")}</p>
+                </div>
+              ))}
+            </Panel>
             <Panel title="Asesmen & perkembangan luka">
               <form
                 className="space-y-3"

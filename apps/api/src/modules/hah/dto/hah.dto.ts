@@ -266,6 +266,23 @@ export class CreateWoundAssessmentDto {
   @IsDateString() nextReviewAt!: string;
 }
 
+export class CreateFunctionalAssessmentDto {
+  @IsString() @MinLength(2) mobilityLevel!: string;
+  @IsInt() @Min(0) @Max(100) adlScore!: number;
+  @IsIn(["LOW", "MODERATE", "HIGH"]) fallRisk!: string;
+  @IsInt() @Min(0) @Max(30) fallsLast30Days!: number;
+  @IsOptional() @IsString() gaitAid?: string;
+  @IsString() @MinLength(2) transferAbility!: string;
+  @IsOptional() @IsString() enduranceNotes?: string;
+  @IsOptional() @IsString() homeHazards?: string;
+  @IsString() @MinLength(5) rehabilitationGoals!: string;
+  @IsString() @MinLength(5) exercisePlan!: string;
+  @IsOptional() @IsString() caregiverTraining?: string;
+  @IsIn(["IMPROVING", "STABLE", "DECLINING", "GOAL_ACHIEVED"])
+  progress!: string;
+  @IsDateString() nextReviewAt!: string;
+}
+
 export class CreateDiagnosticOrderDto {
   @IsString() category!: string;
   @IsString() @MinLength(2) testName!: string;
