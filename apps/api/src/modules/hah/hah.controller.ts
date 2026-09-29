@@ -42,6 +42,7 @@ import {
   CreateFunctionalAssessmentDto,
   CreateNutritionAssessmentDto,
   CreatePalliativeAssessmentDto,
+  CreateEducationRecordDto,
   DiagnosticResultDto,
   DischargeDto,
   EndCareAssignmentDto,
@@ -337,6 +338,30 @@ export class HaHController {
   )
   palliativeAssessments(@Param("id") id: string) {
     return this.hah.listPalliativeAssessments(id);
+  }
+
+  @Get("episodes/:id/education-records")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  educationRecords(@Param("id") id: string) {
+    return this.hah.listEducationRecords(id);
+  }
+
+  @Post("episodes/:id/education-records")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "SUPER_ADMIN")
+  createEducationRecord(
+    @Param("id") id: string,
+    @Body() dto: CreateEducationRecordDto,
+    @CurrentUser() actor: { id: string },
+  ) {
+    return this.hah.createEducationRecord(id, dto, actor.id);
   }
 
   @Post("episodes/:id/palliative-assessments")

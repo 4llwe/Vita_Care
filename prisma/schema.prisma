@@ -788,6 +788,18 @@ enum NutritionRiskLevel {
   HIGH
 }
 
+enum EducationAudience {
+  PATIENT
+  CAREGIVER
+  BOTH
+}
+
+enum EducationComprehension {
+  UNDERSTOOD
+  PARTIAL
+  NEEDS_REINFORCEMENT
+}
+
 enum ClinicalTaskCategory {
   ASSESSMENT
   VITALS
@@ -877,12 +889,36 @@ model HaHEpisode {
   functionalAssessments  HaHFunctionalAssessment[]
   nutritionAssessments   HaHNutritionAssessment[]
   palliativeAssessments  HaHPalliativeAssessment[]
+  educationRecords       HaHEducationRecord[]
   messages               HaHClinicalMessage[]
   breakGlassAccesses     HaHBreakGlassAccess[]
   careAssignments       CareAssignment[]
 
   @@index([status, createdAt])
   @@index([patientId, createdAt])
+}
+
+model HaHEducationRecord {
+  id                  String                   @id @default(cuid())
+  episodeId           String
+  episode             HaHEpisode               @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  topic               String
+  audience            EducationAudience
+  contentSummary      String
+  deliveryMethod      String
+  language            String
+  teachBackResponse   String
+  comprehension       EducationComprehension
+  barriers            String?
+  reinforcementPlan   String?
+  educationalMaterial String?
+  nextReviewAt        DateTime?
+  educatedById        String
+  educatedAt          DateTime                 @default(now())
+  createdAt           DateTime                 @default(now())
+
+  @@index([episodeId, educatedAt])
+  @@index([comprehension, nextReviewAt])
 }
 
 model HaHPalliativeAssessment {

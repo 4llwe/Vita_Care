@@ -317,6 +317,21 @@ export class CreatePalliativeAssessmentDto {
   @IsDateString() nextReviewAt!: string;
 }
 
+export class CreateEducationRecordDto {
+  @IsString() @MinLength(3) topic!: string;
+  @IsIn(["PATIENT", "CAREGIVER", "BOTH"]) audience!: string;
+  @IsString() @MinLength(10) contentSummary!: string;
+  @IsString() @MinLength(2) deliveryMethod!: string;
+  @IsString() @MinLength(2) language!: string;
+  @IsString() @MinLength(5) teachBackResponse!: string;
+  @IsIn(["UNDERSTOOD", "PARTIAL", "NEEDS_REINFORCEMENT"])
+  comprehension!: string;
+  @IsOptional() @IsString() barriers?: string;
+  @IsOptional() @IsString() reinforcementPlan?: string;
+  @IsOptional() @IsString() educationalMaterial?: string;
+  @IsOptional() @IsDateString() nextReviewAt?: string;
+}
+
 export class CreateDiagnosticOrderDto {
   @IsString() category!: string;
   @IsString() @MinLength(2) testName!: string;
