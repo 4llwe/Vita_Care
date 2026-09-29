@@ -39,6 +39,7 @@ import {
   CreatePatientDto,
   CreateVisitDto,
   CreateWoundAssessmentDto,
+  CreateFunctionalAssessmentDto,
   DiagnosticResultDto,
   DischargeDto,
   EndCareAssignmentDto,
@@ -292,6 +293,30 @@ export class HaHController {
   )
   woundAssessments(@Param("id") id: string) {
     return this.hah.listWoundAssessments(id);
+  }
+
+  @Get("episodes/:id/functional-assessments")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  functionalAssessments(@Param("id") id: string) {
+    return this.hah.listFunctionalAssessments(id);
+  }
+
+  @Post("episodes/:id/functional-assessments")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "SUPER_ADMIN")
+  createFunctionalAssessment(
+    @Param("id") id: string,
+    @Body() dto: CreateFunctionalAssessmentDto,
+    @CurrentUser() actor: { id: string },
+  ) {
+    return this.hah.createFunctionalAssessment(id, dto, actor.id);
   }
 
   @Post("episodes/:id/wounds")

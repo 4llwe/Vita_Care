@@ -19,6 +19,8 @@ import {
   MedicationOrderStatus,
   PharmacyFulfillmentStatus,
   WoundProgress,
+  FallRiskLevel,
+  FunctionalProgress,
 } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/actor";
@@ -44,6 +46,7 @@ import {
   CreatePatientDto,
   CreateVisitDto,
   CreateWoundAssessmentDto,
+  CreateFunctionalAssessmentDto,
   DiagnosticResultDto,
   DischargeDto,
   EndCareAssignmentDto,
@@ -1648,6 +1651,76 @@ export class HaHService {
     return assignment;
   }
 
+  listFunctionalAssessments(episodeId: string) {
+    return this.prisma.haHFunctionalAssessment.findMany({
+      where: { episodeId },
+      orderBy: { assessedAt: "desc" },
+      take: 200,
+    });
+  }
+
+  async createFunctionalAssessment(
+    episodeId: string,
+    dto: CreateFunctionalAssessmentDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (
+      !(
+        [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException("Asesmen fungsi memerlukan episode aktif");
+    const nextReviewAt = new Date(dto.nextReviewAt);
+    if (nextReviewAt <= new Date())
+      throw new BadRequestException("Review rehabilitasi harus di masa depan");
+    const assessment = await this.prisma.haHFunctionalAssessment.create({
+      data: {
+        episodeId,
+        mobilityLevel: dto.mobilityLevel.trim(),
+        adlScore: dto.adlScore,
+        fallRisk: dto.fallRisk as FallRiskLevel,
+        fallsLast30Days: dto.fallsLast30Days,
+        gaitAid: dto.gaitAid?.trim() || null,
+        transferAbility: dto.transferAbility.trim(),
+        enduranceNotes: dto.enduranceNotes?.trim() || null,
+        homeHazards: dto.homeHazards?.trim() || null,
+        rehabilitationGoals: dto.rehabilitationGoals.trim(),
+        exercisePlan: dto.exercisePlan.trim(),
+        caregiverTraining: dto.caregiverTraining?.trim() || null,
+        progress: dto.progress as FunctionalProgress,
+        nextReviewAt,
+        assessedById: actorId,
+      },
+    });
+    if (
+      dto.fallRisk === FallRiskLevel.HIGH ||
+      dto.fallsLast30Days > 0 ||
+      dto.progress === FunctionalProgress.DECLINING
+    ) {
+      await this.prisma.clinicalAlert.create({
+        data: {
+          episodeId,
+          severity: ClinicalAlertSeverity.HIGH,
+          trigger: `Risiko jatuh/fungsi: ${dto.fallRisk}`,
+          responseDueAt: new Date(Date.now() + 4 * 60 * 60_000),
+        },
+      });
+      await this.notify.enqueue({
+        channel: "in-app",
+        title: "Risiko jatuh atau penurunan fungsi",
+        body: `${episode.code}: diperlukan review rehabilitasi dan keselamatan rumah`,
+      });
+    }
+    await this.auditEpisodeEvent(actorId, "FUNCTIONAL_ASSESSMENT_RECORDED", episodeId, {
+      functionalAssessmentId: assessment.id,
+      fallRisk: assessment.fallRisk,
+      adlScore: assessment.adlScore,
+      progress: assessment.progress,
+    });
+    return assessment;
+  }
+
   listWoundAssessments(episodeId: string) {
     return this.prisma.haHWoundAssessment.findMany({
       where: { episodeId },
@@ -2382,6 +2455,7 @@ export class HaHService {
           orderBy: [{ status: "asc" }, { priority: "desc" }, { dueAt: "asc" }],
         },
         woundAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
+        functionalAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,
@@ -2438,6 +2512,7 @@ export class HaHService {
       visible.equipmentAssignments = [];
       visible.clinicalTasks = [];
       visible.woundAssessments = [];
+      visible.functionalAssessments = [];
     }
     if (!scope.includes("MEDICATIONS")) visible.medicationOrders = [];
     if (!scope.includes("DIAGNOSTICS")) visible.diagnosticOrders = [];

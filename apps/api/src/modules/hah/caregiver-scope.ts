@@ -28,6 +28,7 @@ export function requiredCaregiverScope(
   if (
     path.includes("care-plan") ||
     path.includes("wounds") ||
+    path.includes("functional-assessments") ||
     path.includes("tasks") ||
     path.includes("clinical-tasks") ||
     path.includes("evaluations") ||

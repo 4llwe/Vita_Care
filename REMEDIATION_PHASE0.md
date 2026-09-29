@@ -144,5 +144,11 @@
 - Deterioration or documented infection signs create a high-priority clinical alert and notify the care team; the system does not generate an automatic diagnosis.
 - Wound documentation is included in episode audit trails and follows existing episode access and caregiver care-plan consent.
 
+## Phase 2.9 — functional rehabilitation and fall prevention
+- Added longitudinal functional assessments covering mobility, ADL score, transfer ability, endurance, recent falls, assistive devices, and home hazards.
+- Rehabilitation goals, exercise plans, caregiver training, progress, and review dates remain attached to the active Hospital at Home episode.
+- High fall risk, a recent fall, or declining function creates a high-priority clinical alert for team review without generating an automatic diagnosis.
+- Functional documentation follows existing episode access, caregiver care-plan consent, and clinical audit trails.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

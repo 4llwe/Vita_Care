@@ -6,6 +6,7 @@ import {
   HaHEpisodeStatus,
   PharmacyFulfillmentStatus,
   WoundProgress,
+  FallRiskLevel,
 } from "@prisma/client";
 import { HaHService } from "./hah.service";
 
@@ -677,6 +678,49 @@ describe("HaHService wound-care workflow", () => {
         nextReviewAt: "2030-01-01T08:00:00Z",
       },
       "nurse-1",
+    );
+    expect(prisma.clinicalAlert.create).toHaveBeenCalled();
+    expect(notify.enqueue).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});
+
+describe("HaHService functional rehabilitation workflow", () => {
+  it("membuat alert untuk risiko jatuh tinggi", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          code: "HAH-001",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      haHFunctionalAssessment: {
+        create: jest.fn().mockResolvedValue({
+          id: "function-1",
+          fallRisk: FallRiskLevel.HIGH,
+          adlScore: 35,
+          progress: "DECLINING",
+        }),
+      },
+      clinicalAlert: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const notify = { enqueue: jest.fn().mockResolvedValue({}) };
+    await new HaHService(prisma, notify as any).createFunctionalAssessment(
+      "episode-1",
+      {
+        mobilityLevel: "Bantuan satu orang",
+        adlScore: 35,
+        fallRisk: "HIGH",
+        fallsLast30Days: 1,
+        transferAbility: "Butuh bantuan",
+        rehabilitationGoals: "Transfer aman ke kursi",
+        exercisePlan: "Latihan duduk berdiri terawasi",
+        progress: "DECLINING",
+        nextReviewAt: "2030-01-01T08:00:00Z",
+      },
+      "physio-1",
     );
     expect(prisma.clinicalAlert.create).toHaveBeenCalled();
     expect(notify.enqueue).toHaveBeenCalled();
