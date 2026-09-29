@@ -2570,9 +2570,24 @@ export class HaHService {
     return updated;
   }
 
-  async updateVisit(id: string, dto: UpdateVisitStatusDto) {
-    const visit = await this.prisma.haHVisit.findUnique({ where: { id } });
+  async updateVisit(
+    id: string,
+    dto: UpdateVisitStatusDto,
+    actor: AuthActor,
+  ) {
+    const visit = await this.prisma.haHVisit.findUnique({
+      where: { id },
+      include: {
+        healthWorker: { select: { userId: true } },
+        episode: { select: { code: true } },
+      },
+    });
     if (!visit) throw new NotFoundException("Kunjungan tidak ditemukan");
+    if (
+      visit.healthWorker.userId !== actor.id &&
+      !actorHasAnyRole(actor, ["DOCTOR", "COORDINATOR", "SUPER_ADMIN"])
+    )
+      throw new ForbiddenException("Kunjungan ditugaskan kepada petugas lain");
     const next = dto.status as HaHVisitStatus;
     const transitions: Record<HaHVisitStatus, HaHVisitStatus[]> = {
       PLANNED: [HaHVisitStatus.EN_ROUTE, HaHVisitStatus.CANCELLED],
@@ -2585,17 +2600,73 @@ export class HaHService {
       throw new BadRequestException(
         `Transisi kunjungan ${visit.status} → ${next} tidak valid`,
       );
-    if (next === HaHVisitStatus.COMPLETED && !dto.handoverNote)
-      throw new BadRequestException("Handover note wajib saat kunjungan selesai");
-    return this.prisma.haHVisit.update({
+    if (next === HaHVisitStatus.IN_PROGRESS && !dto.identityVerified)
+      throw new BadRequestException(
+        "Identitas pasien harus diverifikasi saat tiba",
+      );
+    if (
+      next === HaHVisitStatus.COMPLETED &&
+      (!dto.clinicalNote?.trim() ||
+        !dto.interventions?.trim() ||
+        !dto.patientResponse?.trim() ||
+        !dto.nextPlan?.trim() ||
+        !dto.handoverNote?.trim())
+    )
+      throw new BadRequestException(
+        "Catatan klinis, tindakan, respons, rencana, dan handover wajib saat selesai",
+      );
+    if (
+      next === HaHVisitStatus.CANCELLED &&
+      !dto.cancellationReason?.trim()
+    )
+      throw new BadRequestException("Alasan pembatalan wajib dicatat");
+    const updated = await this.prisma.haHVisit.update({
       where: { id },
       data: {
         status: next,
-        handoverNote: dto.handoverNote,
-        ...(next === HaHVisitStatus.IN_PROGRESS ? { arrivedAt: new Date() } : {}),
-        ...(next === HaHVisitStatus.COMPLETED ? { completedAt: new Date() } : {}),
+        ...(next === HaHVisitStatus.IN_PROGRESS
+          ? { arrivedAt: new Date(), identityVerifiedAt: new Date() }
+          : {}),
+        ...(next === HaHVisitStatus.COMPLETED
+          ? {
+              completedAt: new Date(),
+              clinicalNote: dto.clinicalNote!.trim(),
+              interventions: dto.interventions!.trim(),
+              patientResponse: dto.patientResponse!.trim(),
+              nextPlan: dto.nextPlan!.trim(),
+              handoverNote: dto.handoverNote!.trim(),
+            }
+          : {}),
+        ...(next === HaHVisitStatus.CANCELLED
+          ? {
+              cancellationReason: dto.cancellationReason!.trim(),
+              cancelledById: actor.id,
+            }
+          : {}),
       },
     });
+    if (
+      next === HaHVisitStatus.CANCELLED &&
+      visit.scheduledStart <= new Date(Date.now() + 2 * 60 * 60_000)
+    ) {
+      await this.prisma.clinicalAlert.create({
+        data: {
+          episodeId: visit.episodeId,
+          severity: ClinicalAlertSeverity.MEDIUM,
+          trigger: `Kunjungan dibatalkan: ${visit.visitType}`,
+          responseDueAt: new Date(Date.now() + 60 * 60_000),
+        },
+      });
+      await this.notify.enqueueClinical(
+        "Kunjungan rumah dibatalkan",
+        `${visit.episode.code}: ${visit.visitType} memerlukan penjadwalan ulang`,
+      );
+    }
+    await this.auditEpisodeEvent(actor.id, `VISIT_${next}`, visit.episodeId, {
+      visitId: id,
+      cancellationReason: dto.cancellationReason,
+    });
+    return updated;
   }
 
   async listCaregivers(episodeId: string) {

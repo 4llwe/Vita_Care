@@ -1310,6 +1310,79 @@ export default function EpisodePage() {
                   {v.visitType} ·{" "}
                   {new Date(v.scheduledStart).toLocaleString("id-ID")} ·{" "}
                   {v.status}
+                  {v.status === "PLANNED" ? (
+                    <button
+                      onClick={() =>
+                        patch(`/hah/visits/${v.id}/status`, {
+                          status: "EN_ROUTE",
+                        })
+                      }
+                      className="ml-2 rounded border px-3 py-2"
+                    >
+                      Berangkat
+                    </button>
+                  ) : null}
+                  {v.status === "EN_ROUTE" ? (
+                    <button
+                      onClick={() =>
+                        patch(`/hah/visits/${v.id}/status`, {
+                          status: "IN_PROGRESS",
+                          identityVerified: true,
+                        })
+                      }
+                      className="ml-2 rounded border px-3 py-2"
+                    >
+                      Verifikasi pasien & mulai
+                    </button>
+                  ) : null}
+                  {["PLANNED", "EN_ROUTE"].includes(v.status) ? (
+                    <button
+                      onClick={() => {
+                        const cancellationReason = window.prompt(
+                          "Alasan pembatalan kunjungan",
+                        );
+                        if (cancellationReason)
+                          patch(`/hah/visits/${v.id}/status`, {
+                            status: "CANCELLED",
+                            cancellationReason,
+                          });
+                      }}
+                      className="ml-2 rounded border border-red-300 px-3 py-2 text-red-700"
+                    >
+                      Batalkan
+                    </button>
+                  ) : null}
+                  {v.status === "IN_PROGRESS" ? (
+                    <form
+                      className="mt-3 space-y-3 border-t pt-3"
+                      onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                        e.preventDefault();
+                        const f = new FormData(e.currentTarget);
+                        patch(`/hah/visits/${v.id}/status`, {
+                          status: "COMPLETED",
+                          clinicalNote: f.get("visitClinicalNote"),
+                          interventions: f.get("visitInterventions"),
+                          patientResponse: f.get("visitPatientResponse"),
+                          nextPlan: f.get("visitNextPlan"),
+                          handoverNote: f.get("visitHandover"),
+                        });
+                      }}
+                    >
+                      <Field label="Catatan klinis"><textarea name="visitClinicalNote" required className={input} /></Field>
+                      <Field label="Tindakan/intervensi"><textarea name="visitInterventions" required className={input} /></Field>
+                      <Field label="Respons pasien"><textarea name="visitPatientResponse" required className={input} /></Field>
+                      <Field label="Rencana berikutnya"><textarea name="visitNextPlan" required className={input} /></Field>
+                      <Field label="Handover"><textarea name="visitHandover" required className={input} /></Field>
+                      <button className={btn} disabled={busy}>Selesaikan kunjungan</button>
+                    </form>
+                  ) : null}
+                  {v.status === "COMPLETED" ? (
+                    <div className="mt-3 rounded-lg bg-white p-3">
+                      <p><b>Catatan:</b> {v.clinicalNote}</p>
+                      <p><b>Rencana:</b> {v.nextPlan}</p>
+                      <p><b>Handover:</b> {v.handoverNote}</p>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </Panel>

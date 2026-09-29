@@ -272,9 +272,15 @@ export class CreateVisitDto {
 }
 
 export class UpdateVisitStatusDto {
-  @IsIn(["PLANNED", "EN_ROUTE", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
+  @IsIn(["EN_ROUTE", "IN_PROGRESS", "COMPLETED", "CANCELLED"])
   status!: string;
+  @IsOptional() @IsBoolean() identityVerified?: boolean;
+  @IsOptional() @IsString() clinicalNote?: string;
+  @IsOptional() @IsString() interventions?: string;
+  @IsOptional() @IsString() patientResponse?: string;
+  @IsOptional() @IsString() nextPlan?: string;
   @IsOptional() @IsString() handoverNote?: string;
+  @IsOptional() @IsString() cancellationReason?: string;
 }
 
 export class CreateWoundAssessmentDto {

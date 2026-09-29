@@ -628,8 +628,12 @@ export class HaHController {
 
   @Patch("visits/:id/status")
   @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
-  visitStatus(@Param("id") id: string, @Body() dto: UpdateVisitStatusDto) {
-    return this.hah.updateVisit(id, dto);
+  visitStatus(
+    @Param("id") id: string,
+    @Body() dto: UpdateVisitStatusDto,
+    @CurrentUser() actor: AuthActor,
+  ) {
+    return this.hah.updateVisit(id, dto, actor);
   }
 
   @Get("episodes")

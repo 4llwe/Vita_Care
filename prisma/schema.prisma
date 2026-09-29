@@ -1372,8 +1372,15 @@ model HaHVisit {
   scheduledStart      DateTime
   scheduledEnd        DateTime
   arrivedAt           DateTime?
+  identityVerifiedAt  DateTime?
   completedAt         DateTime?
+  clinicalNote        String?
+  interventions       String?
+  patientResponse     String?
+  nextPlan            String?
   handoverNote        String?
+  cancellationReason  String?
+  cancelledById       String?
   createdAt           DateTime       @default(now())
 
   @@index([episodeId, scheduledStart])

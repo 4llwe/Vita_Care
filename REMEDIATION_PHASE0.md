@@ -192,5 +192,11 @@
 - Concerning or emergency clinical status creates a high/critical alert with response timing; explicit escalation requires a documented plan.
 - Follow-up records remain linked to the episode and follow existing caregiver care-plan consent and audit controls.
 
+## Phase 2.17 — safe home-visit execution
+- Extended existing scheduled visits with controlled execution states rather than creating a parallel visit system.
+- Starting care requires patient identity verification; completion requires clinical notes, interventions, patient response, next plan, and handover.
+- Only the assigned worker or an authorized doctor/coordinator may update a visit, and every transition is audited.
+- Cancellation requires a reason; near-term cancellation creates a clinical alert and team notification so the visit is actively rescheduled.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.
