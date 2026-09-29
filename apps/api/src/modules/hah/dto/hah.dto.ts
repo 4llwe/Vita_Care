@@ -245,6 +245,27 @@ export class UpdateVisitStatusDto {
   @IsOptional() @IsString() handoverNote?: string;
 }
 
+export class CreateWoundAssessmentDto {
+  @IsString() @MinLength(2) woundLabel!: string;
+  @IsString() @MinLength(2) location!: string;
+  @IsString() @MinLength(2) woundType!: string;
+  @IsOptional() @IsNumber() @Min(0) lengthCm?: number;
+  @IsOptional() @IsNumber() @Min(0) widthCm?: number;
+  @IsOptional() @IsNumber() @Min(0) depthCm?: number;
+  @IsString() @MinLength(3) tissueDescription!: string;
+  @IsString() @MinLength(2) exudate!: string;
+  @IsBoolean() odor!: boolean;
+  @IsString() @MinLength(3) surroundingSkin!: string;
+  @IsInt() @Min(0) @Max(10) painScore!: number;
+  @IsBoolean() infectionSigns!: boolean;
+  @IsIn(["IMPROVING", "STABLE", "DETERIORATING", "HEALED"])
+  progress!: string;
+  @IsOptional() @IsString() cleansing?: string;
+  @IsString() @MinLength(2) dressing!: string;
+  @IsOptional() @IsString() education?: string;
+  @IsDateString() nextReviewAt!: string;
+}
+
 export class CreateDiagnosticOrderDto {
   @IsString() category!: string;
   @IsString() @MinLength(2) testName!: string;

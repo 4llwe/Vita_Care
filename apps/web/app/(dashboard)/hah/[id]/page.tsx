@@ -853,6 +853,84 @@ export default function EpisodePage() {
                 </div>
               ))}
             </Panel>
+            <Panel title="Asesmen & perkembangan luka">
+              <form
+                className="space-y-3"
+                onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  const number = (name: string) =>
+                    f.get(name) === "" ? undefined : Number(f.get(name));
+                  submit(`/hah/episodes/${id}/wounds`, {
+                    woundLabel: f.get("woundLabel"),
+                    location: f.get("location"),
+                    woundType: f.get("woundType"),
+                    lengthCm: number("lengthCm"),
+                    widthCm: number("widthCm"),
+                    depthCm: number("depthCm"),
+                    tissueDescription: f.get("tissueDescription"),
+                    exudate: f.get("exudate"),
+                    odor: f.get("odor") === "on",
+                    surroundingSkin: f.get("surroundingSkin"),
+                    painScore: Number(f.get("painScore")),
+                    infectionSigns: f.get("infectionSigns") === "on",
+                    progress: f.get("progress"),
+                    cleansing: f.get("cleansing") || undefined,
+                    dressing: f.get("dressing"),
+                    education: f.get("education") || undefined,
+                    nextReviewAt: new Date(
+                      String(f.get("nextReviewAt")),
+                    ).toISOString(),
+                  });
+                }}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Identitas luka">
+                    <input name="woundLabel" required className={input} placeholder="Luka tumit kanan" />
+                  </Field>
+                  <Field label="Lokasi anatomis">
+                    <input name="location" required className={input} />
+                  </Field>
+                  <Field label="Jenis luka">
+                    <input name="woundType" required className={input} />
+                  </Field>
+                  <Field label="Perkembangan">
+                    <select name="progress" className={input}>
+                      <option value="IMPROVING">Membaik</option>
+                      <option value="STABLE">Stabil</option>
+                      <option value="DETERIORATING">Memburuk</option>
+                      <option value="HEALED">Sembuh</option>
+                    </select>
+                  </Field>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field label="Panjang (cm)"><input name="lengthCm" type="number" min="0" step="0.1" className={input} /></Field>
+                  <Field label="Lebar (cm)"><input name="widthCm" type="number" min="0" step="0.1" className={input} /></Field>
+                  <Field label="Kedalaman (cm)"><input name="depthCm" type="number" min="0" step="0.1" className={input} /></Field>
+                </div>
+                <Field label="Jaringan dasar luka"><input name="tissueDescription" required className={input} /></Field>
+                <Field label="Eksudat"><input name="exudate" required className={input} /></Field>
+                <Field label="Kulit sekitar"><input name="surroundingSkin" required className={input} /></Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Skala nyeri 0–10"><input name="painScore" type="number" min="0" max="10" required className={input} /></Field>
+                  <Field label="Review berikutnya"><input name="nextReviewAt" type="datetime-local" required className={input} /></Field>
+                </div>
+                <label className="flex gap-2"><input name="odor" type="checkbox" /> Terdapat bau</label>
+                <label className="flex gap-2 font-semibold text-red-700"><input name="infectionSigns" type="checkbox" /> Terdapat tanda infeksi</label>
+                <Field label="Pembersihan"><input name="cleansing" className={input} /></Field>
+                <Field label="Balutan/tindakan"><input name="dressing" required className={input} /></Field>
+                <Field label="Edukasi pasien/caregiver"><textarea name="education" className={input} /></Field>
+                <button className={btn} disabled={busy}>Simpan asesmen luka</button>
+              </form>
+              {d.woundAssessments?.map((w: any) => (
+                <div key={w.id} className={`rounded-xl border p-3 text-sm ${w.infectionSigns || w.progress === "DETERIORATING" ? "border-red-300 bg-red-50" : "bg-slate-50"}`}>
+                  <strong>{w.woundLabel}</strong> · {w.location} · {w.progress}
+                  <p className="mt-1">{[w.lengthCm, w.widthCm, w.depthCm].filter((x: any) => x != null).join(" × ")} cm · Nyeri {w.painScore}/10 · {w.exudate}</p>
+                  <p className="mt-1"><b>Balutan:</b> {w.dressing}</p>
+                  <p className="mt-1 text-xs text-slate-500">Review {new Date(w.nextReviewAt).toLocaleString("id-ID")}</p>
+                </div>
+              ))}
+            </Panel>
             <Panel title="Jadwal kunjungan">
               <form
                 className="space-y-3"

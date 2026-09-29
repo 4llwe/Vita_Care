@@ -18,6 +18,7 @@ import {
   HaHVisitStatus,
   MedicationOrderStatus,
   PharmacyFulfillmentStatus,
+  WoundProgress,
 } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/actor";
@@ -42,6 +43,7 @@ import {
   CreateMedicationFulfillmentDto,
   CreatePatientDto,
   CreateVisitDto,
+  CreateWoundAssessmentDto,
   DiagnosticResultDto,
   DischargeDto,
   EndCareAssignmentDto,
@@ -1646,6 +1648,76 @@ export class HaHService {
     return assignment;
   }
 
+  listWoundAssessments(episodeId: string) {
+    return this.prisma.haHWoundAssessment.findMany({
+      where: { episodeId },
+      orderBy: [{ woundLabel: "asc" }, { assessedAt: "desc" }],
+      take: 200,
+    });
+  }
+
+  async createWoundAssessment(
+    episodeId: string,
+    dto: CreateWoundAssessmentDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (
+      !(
+        [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException("Asesmen luka memerlukan episode aktif");
+    const nextReviewAt = new Date(dto.nextReviewAt);
+    if (nextReviewAt <= new Date())
+      throw new BadRequestException("Jadwal review luka harus di masa depan");
+    const assessment = await this.prisma.haHWoundAssessment.create({
+      data: {
+        episodeId,
+        woundLabel: dto.woundLabel.trim(),
+        location: dto.location.trim(),
+        woundType: dto.woundType.trim(),
+        lengthCm: dto.lengthCm,
+        widthCm: dto.widthCm,
+        depthCm: dto.depthCm,
+        tissueDescription: dto.tissueDescription.trim(),
+        exudate: dto.exudate.trim(),
+        odor: dto.odor,
+        surroundingSkin: dto.surroundingSkin.trim(),
+        painScore: dto.painScore,
+        infectionSigns: dto.infectionSigns,
+        progress: dto.progress as WoundProgress,
+        cleansing: dto.cleansing?.trim() || null,
+        dressing: dto.dressing.trim(),
+        education: dto.education?.trim() || null,
+        nextReviewAt,
+        assessedById: actorId,
+      },
+    });
+    if (dto.infectionSigns || dto.progress === WoundProgress.DETERIORATING) {
+      await this.prisma.clinicalAlert.create({
+        data: {
+          episodeId,
+          severity: ClinicalAlertSeverity.HIGH,
+          trigger: `Perburukan luka: ${dto.woundLabel}`,
+          responseDueAt: new Date(Date.now() + 2 * 60 * 60_000),
+        },
+      });
+      await this.notify.enqueue({
+        channel: "in-app",
+        title: "Perhatian perawatan luka",
+        body: `${episode.code}: ${dto.woundLabel} memerlukan review klinis`,
+      });
+    }
+    await this.auditEpisodeEvent(actorId, "WOUND_ASSESSMENT_RECORDED", episodeId, {
+      woundAssessmentId: assessment.id,
+      woundLabel: assessment.woundLabel,
+      progress: assessment.progress,
+      infectionSigns: assessment.infectionSigns,
+    });
+    return assessment;
+  }
+
   listClinicalTasks(episodeId: string) {
     return this.prisma.haHClinicalTask.findMany({
       where: { episodeId },
@@ -2309,6 +2381,7 @@ export class HaHService {
           },
           orderBy: [{ status: "asc" }, { priority: "desc" }, { dueAt: "asc" }],
         },
+        woundAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,
@@ -2364,6 +2437,7 @@ export class HaHService {
       visible.transfers = [];
       visible.equipmentAssignments = [];
       visible.clinicalTasks = [];
+      visible.woundAssessments = [];
     }
     if (!scope.includes("MEDICATIONS")) visible.medicationOrders = [];
     if (!scope.includes("DIAGNOSTICS")) visible.diagnosticOrders = [];
