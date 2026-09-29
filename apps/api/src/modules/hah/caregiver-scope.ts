@@ -40,6 +40,7 @@ export function requiredCaregiverScope(
     path.includes("transfers") ||
     path.includes("discharge-readiness")
     || path.includes("discharge-checklist")
+    || path.includes("post-discharge-followups")
   )
     return "CARE_PLAN";
   return "SUMMARY";

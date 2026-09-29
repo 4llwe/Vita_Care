@@ -25,6 +25,8 @@ import {
   EducationAudience,
   EducationComprehension,
   TeleconsultationStatus,
+  PostDischargeOutcome,
+  PostDischargeClinicalStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/actor";
@@ -71,6 +73,7 @@ import {
   UpdateVisitStatusDto,
   UpdateTeleconsultationDto,
   UpsertDischargeChecklistDto,
+  CreatePostDischargeFollowUpDto,
 } from "./dto/hah.dto";
 import {
   ClinicalProtocolConfig,
@@ -608,6 +611,98 @@ export class HaHService {
       unacknowledgedCriticalResults,
       dischargeChecklistComplete: !!dischargeChecklist,
     };
+  }
+
+  listPostDischargeFollowUps(episodeId: string) {
+    return this.prisma.haHPostDischargeFollowUp.findMany({
+      where: { episodeId },
+      orderBy: { contactedAt: "desc" },
+      take: 100,
+    });
+  }
+
+  async createPostDischargeFollowUp(
+    episodeId: string,
+    dto: CreatePostDischargeFollowUpDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (episode.status !== HaHEpisodeStatus.DISCHARGED)
+      throw new BadRequestException(
+        "Follow-up pasca-discharge hanya untuk episode yang telah dipulangkan",
+      );
+    if (
+      dto.outcome === PostDischargeOutcome.REACHED &&
+      (!dto.respondent?.trim() || !dto.symptomUpdate?.trim())
+    )
+      throw new BadRequestException(
+        "Responden dan pembaruan gejala wajib untuk kontak yang berhasil",
+      );
+    if (
+      dto.outcome !== PostDischargeOutcome.REACHED &&
+      !dto.nextContactAt
+    )
+      throw new BadRequestException(
+        "Jadwal kontak berikutnya wajib jika belum terhubung",
+      );
+    if (dto.escalationRequired && !dto.escalationPlan?.trim())
+      throw new BadRequestException("Rencana eskalasi wajib dicatat");
+    const nextContactAt = dto.nextContactAt
+      ? new Date(dto.nextContactAt)
+      : undefined;
+    if (nextContactAt && nextContactAt <= new Date())
+      throw new BadRequestException("Kontak berikutnya harus di masa depan");
+    const followUp = await this.prisma.haHPostDischargeFollowUp.create({
+      data: {
+        episodeId,
+        scheduledAt: new Date(dto.scheduledAt),
+        outcome: dto.outcome as PostDischargeOutcome,
+        respondent: dto.respondent?.trim() || null,
+        symptomUpdate: dto.symptomUpdate?.trim() || null,
+        medicationAvailable: dto.medicationAvailable,
+        medicationQuestions: dto.medicationQuestions?.trim() || null,
+        followUpAttended: dto.followUpAttended,
+        newCareNeeds: dto.newCareNeeds?.trim() || null,
+        clinicalStatus:
+          dto.clinicalStatus as PostDischargeClinicalStatus,
+        escalationRequired: dto.escalationRequired,
+        escalationPlan: dto.escalationPlan?.trim() || null,
+        advice: dto.advice?.trim() || null,
+        nextContactAt,
+        contactedById: actorId,
+      },
+    });
+    if (
+      dto.escalationRequired ||
+      dto.clinicalStatus !== PostDischargeClinicalStatus.STABLE
+    ) {
+      const severity =
+        dto.clinicalStatus === PostDischargeClinicalStatus.EMERGENCY
+          ? ClinicalAlertSeverity.CRITICAL
+          : ClinicalAlertSeverity.HIGH;
+      await this.prisma.clinicalAlert.create({
+        data: {
+          episodeId,
+          severity,
+          trigger: `Follow-up pasca-discharge: ${dto.clinicalStatus}`,
+          responseDueAt: new Date(
+            Date.now() +
+              (severity === ClinicalAlertSeverity.CRITICAL ? 15 : 60) * 60_000,
+          ),
+        },
+      });
+      await this.notify.enqueueClinical(
+        "Eskalasi pasca-discharge",
+        `${episode.code}: status ${dto.clinicalStatus}, tindak lanjut segera diperlukan`,
+      );
+    }
+    await this.auditEpisodeEvent(actorId, "POST_DISCHARGE_FOLLOW_UP_RECORDED", episodeId, {
+      followUpId: followUp.id,
+      outcome: followUp.outcome,
+      clinicalStatus: followUp.clinicalStatus,
+      escalationRequired: followUp.escalationRequired,
+    });
+    return followUp;
   }
 
   async upsertDischargeChecklist(
@@ -2975,6 +3070,10 @@ export class HaHService {
         educationRecords: { orderBy: { educatedAt: "desc" }, take: 200 },
         teleconsultations: { orderBy: { scheduledStart: "desc" }, take: 200 },
         dischargeChecklist: true,
+        postDischargeFollowUps: {
+          orderBy: { contactedAt: "desc" },
+          take: 100,
+        },
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,
@@ -3040,6 +3139,7 @@ export class HaHService {
       visible.educationRecords = [];
       visible.teleconsultations = [];
       visible.dischargeChecklist = null;
+      visible.postDischargeFollowUps = [];
     }
     if (!scope.includes("MEDICATIONS")) visible.medicationOrders = [];
     if (!scope.includes("DIAGNOSTICS")) visible.diagnosticOrders = [];

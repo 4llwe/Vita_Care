@@ -1783,6 +1783,70 @@ export default function EpisodePage() {
             </Panel>
           </>
         )}
+        {d.status === "DISCHARGED" && (
+          <Panel title="Follow-up pasca-discharge">
+            <form
+              className="space-y-3"
+              onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                e.preventDefault();
+                const f = new FormData(e.currentTarget);
+                submit(`/hah/episodes/${id}/post-discharge-followups`, {
+                  scheduledAt: new Date(
+                    String(f.get("postDischargeScheduledAt")),
+                  ).toISOString(),
+                  outcome: f.get("postDischargeOutcome"),
+                  respondent: f.get("postDischargeRespondent") || undefined,
+                  symptomUpdate: f.get("postDischargeSymptoms") || undefined,
+                  medicationAvailable:
+                    f.get("medicationAvailable") === "on",
+                  medicationQuestions:
+                    f.get("medicationQuestions") || undefined,
+                  followUpAttended: f.get("followUpAttended") === "on",
+                  newCareNeeds: f.get("newCareNeeds") || undefined,
+                  clinicalStatus: f.get("postDischargeClinicalStatus"),
+                  escalationRequired:
+                    f.get("postDischargeEscalation") === "on",
+                  escalationPlan:
+                    f.get("postDischargeEscalationPlan") || undefined,
+                  advice: f.get("postDischargeAdvice") || undefined,
+                  nextContactAt: f.get("postDischargeNextContact")
+                    ? new Date(
+                        String(f.get("postDischargeNextContact")),
+                      ).toISOString()
+                    : undefined,
+                });
+              }}
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Jadwal kontak"><input name="postDischargeScheduledAt" type="datetime-local" required className={input} /></Field>
+                <Field label="Hasil kontak">
+                  <select name="postDischargeOutcome" className={input}><option value="REACHED">Terhubung</option><option value="NOT_REACHED">Tidak terhubung</option><option value="RESCHEDULED">Dijadwalkan ulang</option></select>
+                </Field>
+                <Field label="Responden"><input name="postDischargeRespondent" className={input} /></Field>
+                <Field label="Status klinis">
+                  <select name="postDischargeClinicalStatus" className={input}><option value="STABLE">Stabil</option><option value="CONCERNING">Perlu perhatian</option><option value="EMERGENCY">Darurat</option></select>
+                </Field>
+              </div>
+              <Field label="Pembaruan gejala"><textarea name="postDischargeSymptoms" className={input} /></Field>
+              <label className="flex gap-2"><input name="medicationAvailable" type="checkbox" /> Semua obat tersedia</label>
+              <Field label="Pertanyaan/kendala obat"><textarea name="medicationQuestions" className={input} /></Field>
+              <label className="flex gap-2"><input name="followUpAttended" type="checkbox" /> Kunjungan lanjutan dihadiri</label>
+              <Field label="Kebutuhan perawatan baru"><textarea name="newCareNeeds" className={input} /></Field>
+              <label className="flex gap-2 font-semibold text-red-700"><input name="postDischargeEscalation" type="checkbox" /> Memerlukan eskalasi</label>
+              <Field label="Rencana eskalasi"><textarea name="postDischargeEscalationPlan" className={input} /></Field>
+              <Field label="Saran yang diberikan"><textarea name="postDischargeAdvice" className={input} /></Field>
+              <Field label="Kontak berikutnya"><input name="postDischargeNextContact" type="datetime-local" className={input} /></Field>
+              <button className={btn} disabled={busy}>Catat follow-up</button>
+            </form>
+            {d.postDischargeFollowUps?.map((f: any) => (
+              <div key={f.id} className={`rounded-xl border p-3 text-sm ${f.clinicalStatus === "STABLE" ? "bg-slate-50" : "border-red-300 bg-red-50"}`}>
+                <strong>{f.outcome}</strong> · {f.clinicalStatus}
+                <p className="mt-1">{f.symptomUpdate ?? "Belum ada pembaruan gejala"}</p>
+                {f.escalationPlan ? <p className="mt-1"><b>Eskalasi:</b> {f.escalationPlan}</p> : null}
+              </div>
+            ))}
+          </Panel>
+        )}
         <Panel title="Clinical alerts">
           {d.alerts?.length ? (
             d.alerts.map((a: any) => (

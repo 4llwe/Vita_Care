@@ -62,6 +62,7 @@ import {
   UpdateVisitStatusDto,
   UpdateTeleconsultationDto,
   UpsertDischargeChecklistDto,
+  CreatePostDischargeFollowUpDto,
 } from "./dto/hah.dto";
 import { HaHService } from "./hah.service";
 import { HaHAccessGuard } from "./hah-access.guard";
@@ -143,6 +144,30 @@ export class HaHController {
     @CurrentUser() actor: { id: string },
   ) {
     return this.hah.upsertDischargeChecklist(id, dto, actor.id);
+  }
+
+  @Get("episodes/:id/post-discharge-followups")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  postDischargeFollowUps(@Param("id") id: string) {
+    return this.hah.listPostDischargeFollowUps(id);
+  }
+
+  @Post("episodes/:id/post-discharge-followups")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  createPostDischargeFollowUp(
+    @Param("id") id: string,
+    @Body() dto: CreatePostDischargeFollowUpDto,
+    @CurrentUser() actor: { id: string },
+  ) {
+    return this.hah.createPostDischargeFollowUp(id, dto, actor.id);
   }
 
   @Patch("alerts/:id/acknowledge")
