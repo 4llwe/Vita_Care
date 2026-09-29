@@ -17,7 +17,8 @@ export function requiredCaregiverScope(
   if (path.includes("messages")) return "MESSAGES";
   if (
     path.includes("medication-adherence") ||
-    path.includes("medications")
+    path.includes("medications") ||
+    path.includes("pharmacy")
   )
     return "MEDICATIONS";
   if (path.includes("diagnostics")) return "DIAGNOSTICS";

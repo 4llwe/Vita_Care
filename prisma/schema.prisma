@@ -706,6 +706,16 @@ enum MedicationOrderStatus {
   CANCELLED
 }
 
+enum PharmacyFulfillmentStatus {
+  REQUESTED
+  CLINICAL_REVIEW
+  APPROVED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
 enum DiagnosticOrderStatus {
   ORDERED
   COLLECTED
@@ -1112,8 +1122,38 @@ model MedicationOrder {
   prescribedById      String
   prescribedAt        DateTime              @default(now())
   administrations     MedicationAdministration[]
+  fulfillments        MedicationFulfillment[]
 
   @@index([episodeId, status])
+}
+
+model MedicationFulfillment {
+  id                  String                    @id @default(cuid())
+  medicationOrderId   String
+  medicationOrder     MedicationOrder           @relation(fields: [medicationOrderId], references: [id], onDelete: Cascade)
+  quantity            String
+  refillNumber        Int                       @default(1)
+  deliveryAddress     String
+  status              PharmacyFulfillmentStatus @default(REQUESTED)
+  requestNote         String?
+  requestedById       String
+  requestedAt         DateTime                  @default(now())
+  reviewedById        String?
+  reviewedAt          DateTime?
+  approvedById        String?
+  approvedAt          DateTime?
+  preparedById        String?
+  preparedAt          DateTime?
+  courierName         String?
+  trackingNote        String?
+  dispatchedAt        DateTime?
+  deliveredAt         DateTime?
+  cancelledAt         DateTime?
+  cancellationReason  String?
+  updatedAt           DateTime                  @updatedAt
+
+  @@index([medicationOrderId, status])
+  @@index([status, requestedAt])
 }
 
 model MedicationAdministration {

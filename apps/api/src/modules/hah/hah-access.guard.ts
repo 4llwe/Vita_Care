@@ -42,6 +42,15 @@ export class HaHAccessGuard implements CanActivate {
           select: { episodeId: true },
         })
       )?.episodeId;
+    else if (path.includes("pharmacy-fulfillments/:id"))
+      episodeId = (
+        await this.prisma.medicationFulfillment.findUnique({
+          where: { id },
+          select: {
+            medicationOrder: { select: { episodeId: true } },
+          },
+        })
+      )?.medicationOrder.episodeId;
     else if (path.includes("visits/:id"))
       episodeId = (
         await this.prisma.haHVisit.findUnique({
@@ -189,6 +198,8 @@ export class HaHAccessGuard implements CanActivate {
         profession.includes("laboratorium") ||
         profession.includes("analis") ||
         profession.includes("patologi");
+      const isPharmacyProfessional =
+        profession.includes("farmasi") || profession.includes("apoteker");
       const doctorOnly = [
         "eligibility",
         "admit",
@@ -215,7 +226,8 @@ export class HaHAccessGuard implements CanActivate {
         !doctorOnly &&
         !isDoctor &&
         !isNurse &&
-        !isDiagnosticProfessional
+        !isDiagnosticProfessional &&
+        !isPharmacyProfessional
       )
         throw new ForbiddenException("Tindakan klinis memerlukan kewenangan yang sesuai");
     }

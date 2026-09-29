@@ -131,5 +131,12 @@
 - Added a responsive role-based laboratory workboard at `/diagnostics`; episode pages remain the source for new orders and link into the structured result workflow.
 - Preserved caregiver diagnostic-consent filtering and episode access controls while allowing nurses to document collection and qualified diagnostic professionals to enter results.
 
+## Phase 2.7 — pharmacy fulfillment and medication delivery
+- Extended active medication orders with refill requests instead of creating a parallel prescription system.
+- Added controlled fulfillment states from request and clinical review through physician approval, preparation, delivery, and receipt.
+- Prevented duplicate open refill requests and required courier identity or cancellation reasons at safety-critical transitions.
+- Added a responsive pharmacy workboard for staff, patients, and authorized caregivers with role-based actions and episode links.
+- Refill requests, approvals, dispensing progress, and delivery confirmation are written to the episode audit trail.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.
