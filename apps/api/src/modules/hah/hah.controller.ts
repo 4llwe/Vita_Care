@@ -39,6 +39,7 @@ import {
   CreateMedicationFulfillmentDto,
   CreatePatientDto,
   CreateVisitDto,
+  CreateTeleconsultationDto,
   CreateWoundAssessmentDto,
   CreateFunctionalAssessmentDto,
   CreateNutritionAssessmentDto,
@@ -59,6 +60,7 @@ import {
   UpdateMedicationStatusDto,
   UpdateMedicationFulfillmentDto,
   UpdateVisitStatusDto,
+  UpdateTeleconsultationDto,
 } from "./dto/hah.dto";
 import { HaHService } from "./hah.service";
 import { HaHAccessGuard } from "./hah-access.guard";
@@ -475,6 +477,40 @@ export class HaHController {
   @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
   visit(@Param("id") id: string, @Body() dto: CreateVisitDto) {
     return this.hah.createVisit(id, dto);
+  }
+
+  @Get("episodes/:id/teleconsultations")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  teleconsultations(@Param("id") id: string) {
+    return this.hah.listTeleconsultations(id);
+  }
+
+  @Post("episodes/:id/teleconsultations")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  createTeleconsultation(
+    @Param("id") id: string,
+    @Body() dto: CreateTeleconsultationDto,
+    @CurrentUser() actor: { id: string },
+  ) {
+    return this.hah.createTeleconsultation(id, dto, actor.id);
+  }
+
+  @Patch("teleconsultations/:id")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  updateTeleconsultation(
+    @Param("id") id: string,
+    @Body() dto: UpdateTeleconsultationDto,
+    @CurrentUser() actor: AuthActor,
+  ) {
+    return this.hah.updateTeleconsultation(id, dto, actor);
   }
 
   @Get("episodes/:id/care-team")

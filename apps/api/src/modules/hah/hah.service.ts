@@ -24,6 +24,7 @@ import {
   NutritionRiskLevel,
   EducationAudience,
   EducationComprehension,
+  TeleconsultationStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/actor";
@@ -54,6 +55,7 @@ import {
   CreatePalliativeAssessmentDto,
   CreateEducationRecordDto,
   CreateEquipmentSafetyCheckDto,
+  CreateTeleconsultationDto,
   DiagnosticResultDto,
   DischargeDto,
   EndCareAssignmentDto,
@@ -67,6 +69,7 @@ import {
   UpdateMedicationStatusDto,
   UpdateMedicationFulfillmentDto,
   UpdateVisitStatusDto,
+  UpdateTeleconsultationDto,
 } from "./dto/hah.dto";
 import {
   ClinicalProtocolConfig,
@@ -1736,6 +1739,160 @@ export class HaHService {
     return assignment;
   }
 
+  listTeleconsultations(episodeId: string) {
+    return this.prisma.haHTeleconsultation.findMany({
+      where: { episodeId },
+      orderBy: { scheduledStart: "desc" },
+      take: 200,
+    });
+  }
+
+  async createTeleconsultation(
+    episodeId: string,
+    dto: CreateTeleconsultationDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (
+      !(
+        [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException("Telekonsultasi memerlukan episode aktif");
+    const clinician = await this.prisma.healthWorker.findUnique({
+      where: { id: dto.clinicianId },
+    });
+    if (!clinician || !clinician.isActive || clinician.licenseValidUntil <= new Date())
+      throw new BadRequestException("Tenaga kesehatan tidak aktif");
+    const assigned = await this.prisma.careAssignment.findFirst({
+      where: {
+        episodeId,
+        healthWorkerId: dto.clinicianId,
+        isActive: true,
+        OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }],
+      },
+    });
+    if (!assigned)
+      throw new BadRequestException(
+        "Telekonsultasi hanya dapat dijadwalkan dengan anggota tim aktif",
+      );
+    const scheduledStart = new Date(dto.scheduledStart);
+    const scheduledEnd = new Date(dto.scheduledEnd);
+    if (scheduledStart <= new Date() || scheduledEnd <= scheduledStart)
+      throw new BadRequestException("Jadwal telekonsultasi tidak valid");
+    const consultation = await this.prisma.haHTeleconsultation.create({
+      data: {
+        episodeId,
+        clinicianId: dto.clinicianId,
+        reason: dto.reason.trim(),
+        scheduledStart,
+        scheduledEnd,
+        meetingUrl: dto.meetingUrl?.trim() || null,
+        consentAt: new Date(dto.consentAt),
+        consentBy: dto.consentBy.trim(),
+        createdById: actorId,
+      },
+    });
+    await this.auditEpisodeEvent(actorId, "TELECONSULTATION_SCHEDULED", episodeId, {
+      teleconsultationId: consultation.id,
+      clinicianId: consultation.clinicianId,
+      scheduledStart: consultation.scheduledStart.toISOString(),
+    });
+    return consultation;
+  }
+
+  async updateTeleconsultation(
+    id: string,
+    dto: UpdateTeleconsultationDto,
+    actor: AuthActor,
+  ) {
+    const current = await this.prisma.haHTeleconsultation.findUnique({
+      where: { id },
+      include: { episode: true },
+    });
+    if (!current) throw new NotFoundException("Telekonsultasi tidak ditemukan");
+    const worker = await this.prisma.healthWorker.findUnique({
+      where: { userId: actor.id },
+      select: { id: true },
+    });
+    if (
+      worker?.id !== current.clinicianId &&
+      !actorHasAnyRole(actor, ["DOCTOR", "SUPER_ADMIN", "COORDINATOR"])
+    )
+      throw new ForbiddenException("Telekonsultasi ditugaskan kepada klinisi lain");
+    const next = dto.status as TeleconsultationStatus;
+    const transitions: Partial<
+      Record<TeleconsultationStatus, TeleconsultationStatus[]>
+    > = {
+      [TeleconsultationStatus.SCHEDULED]: [
+        TeleconsultationStatus.IN_PROGRESS,
+        TeleconsultationStatus.CANCELLED,
+        TeleconsultationStatus.NO_SHOW,
+      ],
+      [TeleconsultationStatus.IN_PROGRESS]: [TeleconsultationStatus.COMPLETED],
+    };
+    if (!(transitions[current.status] ?? []).includes(next))
+      throw new BadRequestException(
+        `Transisi telekonsultasi ${current.status} → ${next} tidak diizinkan`,
+      );
+    if (next === TeleconsultationStatus.IN_PROGRESS && !dto.identityVerified)
+      throw new BadRequestException("Identitas pasien harus diverifikasi");
+    if (
+      next === TeleconsultationStatus.COMPLETED &&
+      (!dto.clinicalSummary?.trim() ||
+        !dto.advice?.trim() ||
+        !dto.followUpPlan?.trim())
+    )
+      throw new BadRequestException(
+        "Ringkasan klinis, saran, dan tindak lanjut wajib dicatat",
+      );
+    if (dto.escalationRequired && !dto.escalationPlan?.trim())
+      throw new BadRequestException("Rencana eskalasi wajib dicatat");
+    if (
+      next === TeleconsultationStatus.CANCELLED &&
+      !dto.cancellationReason?.trim()
+    )
+      throw new BadRequestException("Alasan pembatalan wajib dicatat");
+    const now = new Date();
+    const consultation = await this.prisma.haHTeleconsultation.update({
+      where: { id },
+      data: {
+        status: next,
+        ...(next === TeleconsultationStatus.IN_PROGRESS
+          ? { identityVerifiedAt: now, startedAt: now }
+          : {}),
+        ...(next === TeleconsultationStatus.COMPLETED
+          ? {
+              completedAt: now,
+              clinicalSummary: dto.clinicalSummary!.trim(),
+              advice: dto.advice!.trim(),
+              escalationRequired: dto.escalationRequired ?? false,
+              escalationPlan: dto.escalationPlan?.trim() || null,
+              followUpPlan: dto.followUpPlan!.trim(),
+            }
+          : {}),
+        ...(next === TeleconsultationStatus.CANCELLED
+          ? { cancellationReason: dto.cancellationReason!.trim() }
+          : {}),
+      },
+    });
+    if (next === TeleconsultationStatus.COMPLETED && dto.escalationRequired) {
+      await this.prisma.clinicalAlert.create({
+        data: {
+          episodeId: current.episodeId,
+          severity: ClinicalAlertSeverity.HIGH,
+          trigger: "Telekonsultasi memerlukan eskalasi klinis",
+          responseDueAt: new Date(Date.now() + 60 * 60_000),
+        },
+      });
+    }
+    await this.auditEpisodeEvent(actor.id, `TELECONSULTATION_${next}`, current.episodeId, {
+      teleconsultationId: id,
+      escalationRequired: dto.escalationRequired ?? false,
+    });
+    return consultation;
+  }
+
   listEducationRecords(episodeId: string) {
     return this.prisma.haHEducationRecord.findMany({
       where: { episodeId },
@@ -2752,6 +2909,7 @@ export class HaHService {
         nutritionAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         palliativeAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         educationRecords: { orderBy: { educatedAt: "desc" }, take: 200 },
+        teleconsultations: { orderBy: { scheduledStart: "desc" }, take: 200 },
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,
@@ -2815,6 +2973,7 @@ export class HaHService {
       visible.nutritionAssessments = [];
       visible.palliativeAssessments = [];
       visible.educationRecords = [];
+      visible.teleconsultations = [];
     }
     if (!scope.includes("MEDICATIONS")) visible.medicationOrders = [];
     if (!scope.includes("DIAGNOSTICS")) visible.diagnosticOrders = [];

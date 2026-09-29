@@ -8,6 +8,7 @@ import {
   WoundProgress,
   FallRiskLevel,
   NutritionRiskLevel,
+  TeleconsultationStatus,
 } from "@prisma/client";
 import { HaHService } from "./hah.service";
 
@@ -913,6 +914,69 @@ describe("HaHService equipment safety workflow", () => {
     );
     expect(prisma.clinicalAlert.create).toHaveBeenCalled();
     expect(notify.enqueue).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});
+
+describe("HaHService teleconsultation workflow", () => {
+  it("mewajibkan verifikasi identitas sebelum konsultasi dimulai", async () => {
+    const prisma: any = {
+      haHTeleconsultation: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "tele-1",
+          episodeId: "episode-1",
+          clinicianId: "worker-1",
+          status: TeleconsultationStatus.SCHEDULED,
+          episode: {},
+        }),
+      },
+      healthWorker: {
+        findUnique: jest.fn().mockResolvedValue({ id: "worker-1" }),
+      },
+    };
+    await expect(
+      new HaHService(prisma, {} as any).updateTeleconsultation(
+        "tele-1",
+        { status: "IN_PROGRESS", identityVerified: false },
+        { id: "doctor-1", role: "DOCTOR", roles: ["DOCTOR"] } as any,
+      ),
+    ).rejects.toThrow(/identitas pasien harus diverifikasi/i);
+  });
+
+  it("menyelesaikan konsultasi dan membuat alert bila perlu eskalasi", async () => {
+    const prisma: any = {
+      haHTeleconsultation: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "tele-1",
+          episodeId: "episode-1",
+          clinicianId: "worker-1",
+          status: TeleconsultationStatus.IN_PROGRESS,
+          episode: {},
+        }),
+        update: jest.fn().mockResolvedValue({
+          id: "tele-1",
+          status: TeleconsultationStatus.COMPLETED,
+        }),
+      },
+      healthWorker: {
+        findUnique: jest.fn().mockResolvedValue({ id: "worker-1" }),
+      },
+      clinicalAlert: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    await new HaHService(prisma, {} as any).updateTeleconsultation(
+      "tele-1",
+      {
+        status: "COMPLETED",
+        clinicalSummary: "Sesak meningkat sejak pagi",
+        advice: "Batasi aktivitas dan pantau saturasi",
+        followUpPlan: "Kunjungan dokter dalam satu jam",
+        escalationRequired: true,
+        escalationPlan: "Kunjungan segera dan rujuk bila memburuk",
+      },
+      { id: "doctor-1", role: "DOCTOR", roles: ["DOCTOR"] } as any,
+    );
+    expect(prisma.clinicalAlert.create).toHaveBeenCalled();
     expect(prisma.auditLog.create).toHaveBeenCalled();
   });
 });

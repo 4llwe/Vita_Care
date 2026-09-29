@@ -58,6 +58,13 @@ export class HaHAccessGuard implements CanActivate {
           select: { episodeId: true },
         })
       )?.episodeId;
+    else if (path.includes("teleconsultations/:id"))
+      episodeId = (
+        await this.prisma.haHTeleconsultation.findUnique({
+          where: { id },
+          select: { episodeId: true },
+        })
+      )?.episodeId;
     else if (path.includes("transfers/:id"))
       episodeId = (
         await this.prisma.haHTransfer.findUnique({
