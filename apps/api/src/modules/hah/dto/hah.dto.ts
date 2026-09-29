@@ -332,6 +332,28 @@ export class CreateEducationRecordDto {
   @IsOptional() @IsDateString() nextReviewAt?: string;
 }
 
+export class CreateTeleconsultationDto {
+  @IsString() clinicianId!: string;
+  @IsString() @MinLength(5) reason!: string;
+  @IsDateString() scheduledStart!: string;
+  @IsDateString() scheduledEnd!: string;
+  @IsOptional() @IsString() meetingUrl?: string;
+  @IsDateString() consentAt!: string;
+  @IsString() @MinLength(2) consentBy!: string;
+}
+
+export class UpdateTeleconsultationDto {
+  @IsIn(["IN_PROGRESS", "COMPLETED", "CANCELLED", "NO_SHOW"])
+  status!: string;
+  @IsOptional() @IsBoolean() identityVerified?: boolean;
+  @IsOptional() @IsString() clinicalSummary?: string;
+  @IsOptional() @IsString() advice?: string;
+  @IsOptional() @IsBoolean() escalationRequired?: boolean;
+  @IsOptional() @IsString() escalationPlan?: string;
+  @IsOptional() @IsString() followUpPlan?: string;
+  @IsOptional() @IsString() cancellationReason?: string;
+}
+
 export class CreateDiagnosticOrderDto {
   @IsString() category!: string;
   @IsString() @MinLength(2) testName!: string;

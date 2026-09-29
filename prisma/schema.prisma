@@ -800,6 +800,14 @@ enum EducationComprehension {
   NEEDS_REINFORCEMENT
 }
 
+enum TeleconsultationStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
 enum ClinicalTaskCategory {
   ASSESSMENT
   VITALS
@@ -890,12 +898,42 @@ model HaHEpisode {
   nutritionAssessments   HaHNutritionAssessment[]
   palliativeAssessments  HaHPalliativeAssessment[]
   educationRecords       HaHEducationRecord[]
+  teleconsultations      HaHTeleconsultation[]
   messages               HaHClinicalMessage[]
   breakGlassAccesses     HaHBreakGlassAccess[]
   careAssignments       CareAssignment[]
 
   @@index([status, createdAt])
   @@index([patientId, createdAt])
+}
+
+model HaHTeleconsultation {
+  id                    String                   @id @default(cuid())
+  episodeId             String
+  episode               HaHEpisode               @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  clinicianId           String
+  reason                String
+  scheduledStart        DateTime
+  scheduledEnd          DateTime
+  meetingUrl            String?
+  consentAt             DateTime
+  consentBy             String
+  status                TeleconsultationStatus   @default(SCHEDULED)
+  identityVerifiedAt    DateTime?
+  startedAt             DateTime?
+  completedAt           DateTime?
+  clinicalSummary       String?
+  advice                String?
+  escalationRequired    Boolean                  @default(false)
+  escalationPlan        String?
+  followUpPlan          String?
+  cancellationReason    String?
+  createdById           String
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@index([episodeId, scheduledStart])
+  @@index([clinicianId, status, scheduledStart])
 }
 
 model HaHEducationRecord {

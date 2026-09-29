@@ -174,5 +174,11 @@
 - Non-operational equipment requires a documented issue and action, creates a high-priority alert, and notifies the care team for replacement or repair.
 - Equipment safety records follow existing episode access, caregiver care-plan consent, and clinical audit trails.
 
+## Phase 2.14 — clinical teleconsultation workflow
+- Added episode-scoped teleconsultation scheduling with an active care-team clinician, explicit consent, time window, reason, and optional secure meeting link.
+- Starting a consultation requires patient identity verification; completion requires a clinical summary, advice, and follow-up plan.
+- Escalation identified during teleconsultation requires a documented escalation plan and creates a high-priority clinical alert.
+- Teleconsultation records follow controlled lifecycle transitions, episode access, caregiver care-plan consent, and audit trails; emergency pathways remain separate and prominent.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

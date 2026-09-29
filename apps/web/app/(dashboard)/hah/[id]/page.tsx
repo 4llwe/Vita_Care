@@ -1158,6 +1158,107 @@ export default function EpisodePage() {
                 </div>
               ))}
             </Panel>
+            <Panel title="Telekonsultasi klinis">
+              <p className="text-sm text-slate-600">
+                Untuk konsultasi terjadwal non-darurat. Gunakan tombol DARURAT
+                bila kondisi mengancam nyawa.
+              </p>
+              <form
+                className="space-y-3"
+                onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  submit(`/hah/episodes/${id}/teleconsultations`, {
+                    clinicianId: f.get("teleconsultClinicianId"),
+                    reason: f.get("teleconsultReason"),
+                    scheduledStart: new Date(
+                      String(f.get("teleconsultStart")),
+                    ).toISOString(),
+                    scheduledEnd: new Date(
+                      String(f.get("teleconsultEnd")),
+                    ).toISOString(),
+                    meetingUrl: f.get("meetingUrl") || undefined,
+                    consentAt: new Date().toISOString(),
+                    consentBy: f.get("teleconsultConsentBy"),
+                  });
+                }}
+              >
+                <Field label="Klinisi">
+                  <select name="teleconsultClinicianId" required className={input}>
+                    <option value="">Pilih anggota tim aktif</option>
+                    {d.careAssignments
+                      ?.filter((a: any) => a.isActive)
+                      .map((a: any) => (
+                        <option key={a.id} value={a.healthWorkerId}>
+                          {a.healthWorker?.name} · {a.healthWorker?.profession}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+                <Field label="Alasan konsultasi"><textarea name="teleconsultReason" required className={input} /></Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Mulai"><input name="teleconsultStart" type="datetime-local" required className={input} /></Field>
+                  <Field label="Selesai"><input name="teleconsultEnd" type="datetime-local" required className={input} /></Field>
+                </div>
+                <Field label="Tautan pertemuan aman"><input name="meetingUrl" type="url" className={input} /></Field>
+                <Field label="Pemberi consent"><input name="teleconsultConsentBy" required className={input} /></Field>
+                <button className={btn} disabled={busy}>Jadwalkan telekonsultasi</button>
+              </form>
+              {d.teleconsultations?.map((t: any) => (
+                <div key={t.id} className="rounded-xl border bg-slate-50 p-3 text-sm">
+                  <strong>{t.reason}</strong> · {t.status}
+                  <p className="mt-1">{new Date(t.scheduledStart).toLocaleString("id-ID")}</p>
+                  {t.meetingUrl && t.status === "SCHEDULED" ? (
+                    <a href={t.meetingUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-11 items-center font-semibold text-blue-700">Buka ruang konsultasi</a>
+                  ) : null}
+                  {t.status === "SCHEDULED" ? (
+                    <button
+                      onClick={() =>
+                        patch(`/hah/teleconsultations/${t.id}`, {
+                          status: "IN_PROGRESS",
+                          identityVerified: true,
+                        })
+                      }
+                      className="ml-2 mt-2 rounded border px-3 py-2"
+                    >
+                      Verifikasi identitas & mulai
+                    </button>
+                  ) : null}
+                  {t.status === "IN_PROGRESS" ? (
+                    <form
+                      className="mt-3 space-y-3 border-t pt-3"
+                      onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                        e.preventDefault();
+                        const f = new FormData(e.currentTarget);
+                        patch(`/hah/teleconsultations/${t.id}`, {
+                          status: "COMPLETED",
+                          clinicalSummary: f.get("teleSummary"),
+                          advice: f.get("teleAdvice"),
+                          followUpPlan: f.get("teleFollowUp"),
+                          escalationRequired:
+                            f.get("teleEscalation") === "on",
+                          escalationPlan:
+                            f.get("teleEscalationPlan") || undefined,
+                        });
+                      }}
+                    >
+                      <Field label="Ringkasan klinis"><textarea name="teleSummary" required className={input} /></Field>
+                      <Field label="Saran/instruksi"><textarea name="teleAdvice" required className={input} /></Field>
+                      <Field label="Tindak lanjut"><textarea name="teleFollowUp" required className={input} /></Field>
+                      <label className="flex gap-2 font-semibold text-orange-800"><input name="teleEscalation" type="checkbox" /> Memerlukan eskalasi klinis</label>
+                      <Field label="Rencana eskalasi"><textarea name="teleEscalationPlan" className={input} /></Field>
+                      <button className={btn} disabled={busy}>Selesaikan & dokumentasikan</button>
+                    </form>
+                  ) : null}
+                  {t.status === "COMPLETED" ? (
+                    <div className="mt-3 rounded-lg bg-white p-3">
+                      <p><b>Ringkasan:</b> {t.clinicalSummary}</p>
+                      <p><b>Tindak lanjut:</b> {t.followUpPlan}</p>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </Panel>
             <Panel title="Jadwal kunjungan">
               <form
                 className="space-y-3"
