@@ -853,6 +853,60 @@ export default function EpisodePage() {
                 </div>
               ))}
             </Panel>
+            <Panel title="Edukasi pasien/caregiver & teach-back">
+              <form
+                className="space-y-3"
+                onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  submit(`/hah/episodes/${id}/education-records`, {
+                    topic: f.get("educationTopic"),
+                    audience: f.get("educationAudience"),
+                    contentSummary: f.get("educationContent"),
+                    deliveryMethod: f.get("deliveryMethod"),
+                    language: f.get("educationLanguage"),
+                    teachBackResponse: f.get("teachBackResponse"),
+                    comprehension: f.get("educationComprehension"),
+                    barriers: f.get("educationBarriers") || undefined,
+                    reinforcementPlan:
+                      f.get("reinforcementPlan") || undefined,
+                    educationalMaterial:
+                      f.get("educationalMaterial") || undefined,
+                    nextReviewAt: f.get("educationReviewAt")
+                      ? new Date(
+                          String(f.get("educationReviewAt")),
+                        ).toISOString()
+                      : undefined,
+                  });
+                }}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Topik edukasi"><input name="educationTopic" required className={input} /></Field>
+                  <Field label="Sasaran">
+                    <select name="educationAudience" className={input}><option value="PATIENT">Pasien</option><option value="CAREGIVER">Caregiver</option><option value="BOTH">Pasien & caregiver</option></select>
+                  </Field>
+                  <Field label="Metode"><input name="deliveryMethod" required className={input} placeholder="Demonstrasi / verbal / video" /></Field>
+                  <Field label="Bahasa"><input name="educationLanguage" required defaultValue="Bahasa Indonesia" className={input} /></Field>
+                </div>
+                <Field label="Materi yang diberikan"><textarea name="educationContent" required className={input} /></Field>
+                <Field label="Respons teach-back"><textarea name="teachBackResponse" required className={input} placeholder="Tuliskan kembali apa yang pasien/caregiver demonstrasikan atau jelaskan" /></Field>
+                <Field label="Tingkat pemahaman">
+                  <select name="educationComprehension" className={input}><option value="UNDERSTOOD">Dipahami</option><option value="PARTIAL">Sebagian</option><option value="NEEDS_REINFORCEMENT">Perlu penguatan</option></select>
+                </Field>
+                <Field label="Hambatan belajar"><textarea name="educationBarriers" className={input} /></Field>
+                <Field label="Rencana penguatan"><textarea name="reinforcementPlan" className={input} /></Field>
+                <Field label="Materi/link pendukung"><input name="educationalMaterial" className={input} /></Field>
+                <Field label="Review berikutnya"><input name="educationReviewAt" type="datetime-local" className={input} /></Field>
+                <button className={btn} disabled={busy}>Simpan edukasi</button>
+              </form>
+              {d.educationRecords?.map((r: any) => (
+                <div key={r.id} className={`rounded-xl border p-3 text-sm ${r.comprehension === "NEEDS_REINFORCEMENT" ? "border-amber-300 bg-amber-50" : "bg-slate-50"}`}>
+                  <strong>{r.topic}</strong> · {r.audience} · {r.comprehension.replaceAll("_", " ")}
+                  <p className="mt-1"><b>Teach-back:</b> {r.teachBackResponse}</p>
+                  {r.reinforcementPlan ? <p className="mt-1"><b>Penguatan:</b> {r.reinforcementPlan}</p> : null}
+                </div>
+              ))}
+            </Panel>
             <Panel title="Perawatan paliatif & tujuan perawatan">
               <form
                 className="space-y-3"

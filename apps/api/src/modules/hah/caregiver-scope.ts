@@ -31,6 +31,7 @@ export function requiredCaregiverScope(
     path.includes("functional-assessments") ||
     path.includes("nutrition-assessments") ||
     path.includes("palliative-assessments") ||
+    path.includes("education-records") ||
     path.includes("tasks") ||
     path.includes("clinical-tasks") ||
     path.includes("evaluations") ||

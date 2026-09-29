@@ -22,6 +22,8 @@ import {
   FallRiskLevel,
   FunctionalProgress,
   NutritionRiskLevel,
+  EducationAudience,
+  EducationComprehension,
 } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/actor";
@@ -50,6 +52,7 @@ import {
   CreateFunctionalAssessmentDto,
   CreateNutritionAssessmentDto,
   CreatePalliativeAssessmentDto,
+  CreateEducationRecordDto,
   DiagnosticResultDto,
   DischargeDto,
   EndCareAssignmentDto,
@@ -1654,6 +1657,67 @@ export class HaHService {
     return assignment;
   }
 
+  listEducationRecords(episodeId: string) {
+    return this.prisma.haHEducationRecord.findMany({
+      where: { episodeId },
+      orderBy: { educatedAt: "desc" },
+      take: 200,
+    });
+  }
+
+  async createEducationRecord(
+    episodeId: string,
+    dto: CreateEducationRecordDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (
+      !(
+        [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException("Edukasi memerlukan episode aktif");
+    const needsFollowUp =
+      dto.comprehension !== EducationComprehension.UNDERSTOOD;
+    if (needsFollowUp && !dto.reinforcementPlan?.trim())
+      throw new BadRequestException(
+        "Rencana penguatan wajib jika pemahaman belum penuh",
+      );
+    if (needsFollowUp && !dto.nextReviewAt)
+      throw new BadRequestException(
+        "Jadwal review wajib jika edukasi perlu penguatan",
+      );
+    const nextReviewAt = dto.nextReviewAt
+      ? new Date(dto.nextReviewAt)
+      : undefined;
+    if (nextReviewAt && nextReviewAt <= new Date())
+      throw new BadRequestException("Review edukasi harus di masa depan");
+    const record = await this.prisma.haHEducationRecord.create({
+      data: {
+        episodeId,
+        topic: dto.topic.trim(),
+        audience: dto.audience as EducationAudience,
+        contentSummary: dto.contentSummary.trim(),
+        deliveryMethod: dto.deliveryMethod.trim(),
+        language: dto.language.trim(),
+        teachBackResponse: dto.teachBackResponse.trim(),
+        comprehension: dto.comprehension as EducationComprehension,
+        barriers: dto.barriers?.trim() || null,
+        reinforcementPlan: dto.reinforcementPlan?.trim() || null,
+        educationalMaterial: dto.educationalMaterial?.trim() || null,
+        nextReviewAt,
+        educatedById: actorId,
+      },
+    });
+    await this.auditEpisodeEvent(actorId, "PATIENT_EDUCATION_RECORDED", episodeId, {
+      educationRecordId: record.id,
+      topic: record.topic,
+      audience: record.audience,
+      comprehension: record.comprehension,
+    });
+    return record;
+  }
+
   listPalliativeAssessments(episodeId: string) {
     return this.prisma.haHPalliativeAssessment.findMany({
       where: { episodeId },
@@ -2608,6 +2672,7 @@ export class HaHService {
         functionalAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         nutritionAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         palliativeAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
+        educationRecords: { orderBy: { educatedAt: "desc" }, take: 200 },
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,
@@ -2667,6 +2732,7 @@ export class HaHService {
       visible.functionalAssessments = [];
       visible.nutritionAssessments = [];
       visible.palliativeAssessments = [];
+      visible.educationRecords = [];
     }
     if (!scope.includes("MEDICATIONS")) visible.medicationOrders = [];
     if (!scope.includes("DIAGNOSTICS")) visible.diagnosticOrders = [];

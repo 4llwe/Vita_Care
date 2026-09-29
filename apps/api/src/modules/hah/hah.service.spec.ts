@@ -814,3 +814,66 @@ describe("HaHService palliative-care workflow", () => {
     expect(prisma.auditLog.create).toHaveBeenCalled();
   });
 });
+
+describe("HaHService patient education teach-back workflow", () => {
+  it("mewajibkan rencana penguatan bila pemahaman belum penuh", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+    };
+    await expect(
+      new HaHService(prisma, {} as any).createEducationRecord(
+        "episode-1",
+        {
+          topic: "Tanda bahaya",
+          audience: "CAREGIVER",
+          contentSummary: "Tanda bahaya dan cara menghubungi tim",
+          deliveryMethod: "Demonstrasi",
+          language: "Bahasa Indonesia",
+          teachBackResponse: "Caregiver hanya mengingat sebagian tanda",
+          comprehension: "PARTIAL",
+        },
+        "nurse-1",
+      ),
+    ).rejects.toThrow(/rencana penguatan wajib/i);
+  });
+
+  it("menyimpan teach-back yang dipahami dan mencatat audit", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      haHEducationRecord: {
+        create: jest.fn().mockImplementation(({ data }) =>
+          Promise.resolve({ id: "education-1", ...data }),
+        ),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const result = await new HaHService(
+      prisma,
+      {} as any,
+    ).createEducationRecord(
+      "episode-1",
+      {
+        topic: "Penggunaan oksigen",
+        audience: "BOTH",
+        contentSummary: "Cara penggunaan aman dan tanda bahaya oksigen",
+        deliveryMethod: "Demonstrasi",
+        language: "Bahasa Indonesia",
+        teachBackResponse: "Pasien dan caregiver mendemonstrasikan dengan benar",
+        comprehension: "UNDERSTOOD",
+      },
+      "nurse-1",
+    );
+    expect(result.comprehension).toBe("UNDERSTOOD");
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});

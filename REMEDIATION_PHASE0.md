@@ -162,5 +162,11 @@
 - Any symptom score of 7 or above creates a high-priority clinical alert for timely team review; the system does not prescribe treatment or override emergency pathways.
 - Palliative documentation follows existing episode access, caregiver care-plan consent, and clinical audit trails.
 
+## Phase 2.12 — patient and caregiver education teach-back
+- Added structured education records for the patient, caregiver, or both, including topic, delivery method, language, content, and supporting material.
+- Requires documentation of the learner's teach-back response and comprehension level rather than treating information delivery as proof of understanding.
+- Partial understanding or a need for reinforcement requires a reinforcement plan and scheduled review.
+- Education records remain attached to the active episode and follow existing access, caregiver care-plan consent, and audit controls.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.
