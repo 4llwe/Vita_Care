@@ -4,6 +4,9 @@ import {
   ClinicalAlertSeverity,
   ClinicalAlertStatus,
   CareAssignmentType,
+  ClinicalTaskCategory,
+  ClinicalTaskPriority,
+  ClinicalTaskStatus,
   DiagnosticOrderStatus,
   EquipmentAssignmentStatus,
   EmergencyAction,
@@ -25,6 +28,7 @@ import {
   AdmitEpisodeDto,
   AssessEligibilityDto,
   CarePlanDto,
+  CreateClinicalTaskDto,
   CreateClinicalEvaluationDto,
   CreateEmergencyEventDto,
   CreateClinicalProtocolDto,
@@ -42,6 +46,7 @@ import {
   SendClinicalMessageDto,
   TransferDto,
   UpdateEquipmentStatusDto,
+  UpdateClinicalTaskDto,
   UpdateMedicationStatusDto,
   UpdateVisitStatusDto,
 } from "./dto/hah.dto";
@@ -1283,6 +1288,176 @@ export class HaHService {
     return assignment;
   }
 
+  listClinicalTasks(episodeId: string) {
+    return this.prisma.haHClinicalTask.findMany({
+      where: { episodeId },
+      include: {
+        assignedToHealthWorker: {
+          select: { id: true, name: true, profession: true, zone: true },
+        },
+      },
+      orderBy: [{ status: "asc" }, { priority: "desc" }, { dueAt: "asc" }],
+    });
+  }
+
+  async listMyClinicalTasks(actorId: string, status?: ClinicalTaskStatus) {
+    const worker = await this.prisma.healthWorker.findUnique({
+      where: { userId: actorId },
+      select: { id: true, isActive: true, licenseValidUntil: true },
+    });
+    if (!worker || !worker.isActive || worker.licenseValidUntil <= new Date())
+      throw new ForbiddenException("Profil tenaga kesehatan tidak aktif");
+    return this.prisma.haHClinicalTask.findMany({
+      where: {
+        assignedToHealthWorkerId: worker.id,
+        ...(status ? { status } : {}),
+      },
+      include: {
+        episode: { include: { patient: true } },
+        assignedToHealthWorker: {
+          select: { id: true, name: true, profession: true },
+        },
+      },
+      orderBy: [{ status: "asc" }, { priority: "desc" }, { dueAt: "asc" }],
+      take: 200,
+    });
+  }
+
+  async createClinicalTask(
+    episodeId: string,
+    dto: CreateClinicalTaskDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (
+      !(
+        [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException("Tugas memerlukan episode admitted/active");
+    const worker = await this.prisma.healthWorker.findUnique({
+      where: { id: dto.assignedToHealthWorkerId },
+    });
+    if (!worker || !worker.isActive || worker.licenseValidUntil <= new Date())
+      throw new BadRequestException("Tenaga kesehatan tidak aktif");
+    const assigned = await this.prisma.careAssignment.findFirst({
+      where: {
+        episodeId,
+        healthWorkerId: worker.id,
+        isActive: true,
+        OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }],
+      },
+      select: { id: true },
+    });
+    if (!assigned)
+      throw new BadRequestException(
+        "Tugas hanya dapat diberikan kepada anggota tim perawatan aktif",
+      );
+    const dueAt = new Date(dto.dueAt);
+    if (dueAt <= new Date())
+      throw new BadRequestException("Batas waktu tugas harus di masa depan");
+    const task = await this.prisma.haHClinicalTask.create({
+      data: {
+        episodeId,
+        assignedToHealthWorkerId: worker.id,
+        title: dto.title,
+        description: dto.description,
+        category: dto.category as ClinicalTaskCategory,
+        priority: dto.priority as ClinicalTaskPriority,
+        dueAt,
+        createdById: actorId,
+      },
+      include: {
+        assignedToHealthWorker: {
+          select: { id: true, name: true, profession: true, zone: true },
+        },
+      },
+    });
+    await this.auditEpisodeEvent(actorId, "CLINICAL_TASK_CREATED", episodeId, {
+      clinicalTaskId: task.id,
+      assignedToHealthWorkerId: worker.id,
+      priority: task.priority,
+    });
+    return task;
+  }
+
+  async updateClinicalTask(
+    id: string,
+    dto: UpdateClinicalTaskDto,
+    actor: AuthActor,
+  ) {
+    const task = await this.prisma.haHClinicalTask.findUnique({
+      where: { id },
+      include: { assignedToHealthWorker: { select: { userId: true } } },
+    });
+    if (!task) throw new NotFoundException("Tugas klinis tidak ditemukan");
+    const elevated = actorHasAnyRole(actor, [
+      "SUPER_ADMIN",
+      "COORDINATOR",
+      "DOCTOR",
+    ]);
+    if (task.assignedToHealthWorker.userId !== actor.id && !elevated)
+      throw new ForbiddenException("Tugas ini ditugaskan kepada petugas lain");
+    const next = dto.status as ClinicalTaskStatus;
+    const transitions: Record<ClinicalTaskStatus, ClinicalTaskStatus[]> = {
+      PLANNED: [
+        ClinicalTaskStatus.IN_PROGRESS,
+        ClinicalTaskStatus.CANCELLED,
+      ],
+      IN_PROGRESS: [
+        ClinicalTaskStatus.COMPLETED,
+        ClinicalTaskStatus.OMITTED,
+        ClinicalTaskStatus.CANCELLED,
+      ],
+      COMPLETED: [],
+      OMITTED: [],
+      CANCELLED: [],
+    };
+    if (!transitions[task.status].includes(next))
+      throw new BadRequestException(
+        `Transisi tugas ${task.status} → ${next} tidak valid`,
+      );
+    const closureStatuses: ClinicalTaskStatus[] = [
+      ClinicalTaskStatus.COMPLETED,
+      ClinicalTaskStatus.OMITTED,
+    ];
+    if (
+      closureStatuses.includes(next) &&
+      (!dto.outcomeNote || dto.outcomeNote.trim().length < 5)
+    )
+      throw new BadRequestException("Hasil tindakan wajib didokumentasikan");
+    if (
+      closureStatuses.includes(next) &&
+      (!dto.handoverNote || dto.handoverNote.trim().length < 5)
+    )
+      throw new BadRequestException("Handover wajib didokumentasikan");
+    if (next === ClinicalTaskStatus.CANCELLED && !elevated)
+      throw new ForbiddenException(
+        "Pembatalan tugas memerlukan dokter atau koordinator",
+      );
+    const updated = await this.prisma.haHClinicalTask.update({
+      where: { id },
+      data: {
+        status: next,
+        outcomeNote: dto.outcomeNote,
+        handoverNote: dto.handoverNote,
+        ...(next === ClinicalTaskStatus.IN_PROGRESS
+          ? { startedAt: new Date() }
+          : {}),
+        ...(closureStatuses.includes(next)
+          ? { completedAt: new Date(), completedById: actor.id }
+          : {}),
+      },
+    });
+    await this.auditEpisodeEvent(
+      actor.id,
+      "CLINICAL_TASK_STATUS_CHANGED",
+      task.episodeId,
+      { clinicalTaskId: id, from: task.status, to: next },
+    );
+    return updated;
+  }
+
   async updateVisit(id: string, dto: UpdateVisitStatusDto) {
     const visit = await this.prisma.haHVisit.findUnique({ where: { id } });
     if (!visit) throw new NotFoundException("Kunjungan tidak ditemukan");
@@ -1768,6 +1943,14 @@ export class HaHService {
           },
           orderBy: [{ isActive: "desc" }, { startsAt: "asc" }],
         },
+        clinicalTasks: {
+          include: {
+            assignedToHealthWorker: {
+              select: { id: true, name: true, profession: true, zone: true },
+            },
+          },
+          orderBy: [{ status: "asc" }, { priority: "desc" }, { dueAt: "asc" }],
+        },
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,
@@ -1822,6 +2005,7 @@ export class HaHService {
       visible.clinicalEvaluations = [];
       visible.transfers = [];
       visible.equipmentAssignments = [];
+      visible.clinicalTasks = [];
     }
     if (!scope.includes("MEDICATIONS")) visible.medicationOrders = [];
     if (!scope.includes("DIAGNOSTICS")) visible.diagnosticOrders = [];

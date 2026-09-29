@@ -8,7 +8,7 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import { HaHEpisodeStatus } from "@prisma/client";
+import { ClinicalTaskStatus, HaHEpisodeStatus } from "@prisma/client";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
@@ -21,6 +21,7 @@ import {
   AdmitEpisodeDto,
   AssessEligibilityDto,
   CarePlanDto,
+  CreateClinicalTaskDto,
   CreateClinicalEvaluationDto,
   CreateEmergencyEventDto,
   CreateClinicalProtocolDto,
@@ -40,6 +41,7 @@ import {
   SendClinicalMessageDto,
   TransferDto,
   UpdateEquipmentStatusDto,
+  UpdateClinicalTaskDto,
   UpdateMedicationStatusDto,
   UpdateVisitStatusDto,
 } from "./dto/hah.dto";
@@ -259,6 +261,49 @@ export class HaHController {
   )
   careTeam(@Param("id") id: string) {
     return this.hah.listCareTeam(id);
+  }
+
+  @Get("tasks/my")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE")
+  myClinicalTasks(
+    @CurrentUser() u: { id: string },
+    @Query("status") status?: ClinicalTaskStatus,
+  ) {
+    return this.hah.listMyClinicalTasks(u.id, status);
+  }
+
+  @Get("episodes/:id/tasks")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  clinicalTasks(@Param("id") id: string) {
+    return this.hah.listClinicalTasks(id);
+  }
+
+  @Post("episodes/:id/tasks")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  createClinicalTask(
+    @Param("id") id: string,
+    @Body() dto: CreateClinicalTaskDto,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.createClinicalTask(id, dto, u.id);
+  }
+
+  @Patch("clinical-tasks/:id")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  updateClinicalTask(
+    @Param("id") id: string,
+    @Body() dto: UpdateClinicalTaskDto,
+    @CurrentUser() u: { id: string; role: string; roles?: string[] },
+  ) {
+    return this.hah.updateClinicalTask(id, dto, u as any);
   }
 
   @Post("episodes/:id/care-team")

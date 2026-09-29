@@ -20,7 +20,7 @@ const menus: Record<ClinicalPersona, Item[]> = {
   ]),
   doctor: asItems([
     ["/dashboard", "Dashboard Dokter"], ["/notifications", "Notifikasi Klinis"],
-    ["/hah", "Daftar Pasien"], ["/monitoring", "Monitoring Pasien"],
+    ["/hah", "Daftar Pasien"], ["/tasks", "Tugas Klinis"], ["/monitoring", "Monitoring Pasien"],
     ["/medical-records/new", "Rekam Medis"], ["/workspace/rencana-terapi", "Rencana Terapi"],
     ["/workspace/resep", "Resep"], ["/workspace/hasil-laboratorium", "Hasil Laboratorium"],
     ["/bookings", "Jadwal Kunjungan"], ["/workspace/telekonsultasi", "Telekonsultasi"],
@@ -28,7 +28,7 @@ const menus: Record<ClinicalPersona, Item[]> = {
   ]),
   nurse: asItems([
     ["/dashboard", "Dashboard Perawat"], ["/notifications", "Notifikasi Klinis"],
-    ["/hah", "Pasien Tugas"], ["/bookings", "Jadwal Kunjungan"],
+    ["/tasks", "Papan Tugas"], ["/hah", "Pasien Tugas"], ["/bookings", "Jadwal Kunjungan"],
     ["/workspace/asesmen-keperawatan", "Asesmen Keperawatan"], ["/monitoring", "Tanda Vital"],
     ["/workspace/rencana-asuhan", "Rencana Asuhan"], ["/workspace/pemberian-obat", "Pemberian Obat"],
     ["/workspace/perawatan-luka", "Perawatan Luka"], ["/workspace/edukasi-pasien", "Edukasi Pasien"],

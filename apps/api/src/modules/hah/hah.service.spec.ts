@@ -1,5 +1,9 @@
 import { BadRequestException } from "@nestjs/common";
-import { CareAssignmentType, HaHEpisodeStatus } from "@prisma/client";
+import {
+  CareAssignmentType,
+  ClinicalTaskStatus,
+  HaHEpisodeStatus,
+} from "@prisma/client";
 import { HaHService } from "./hah.service";
 
 describe("HaHService discharge safety", () => {
@@ -367,5 +371,92 @@ describe("HaHService care-team coordination", () => {
         "admin-1",
       ),
     ).rejects.toThrow(/diganti melalui penugasan baru/i);
+  });
+});
+
+describe("HaHService clinical task workflow", () => {
+  it("menolak tugas untuk petugas di luar tim aktif", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      healthWorker: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "worker-1",
+          isActive: true,
+          licenseValidUntil: new Date("2030-01-01T00:00:00Z"),
+        }),
+      },
+      careAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
+
+    await expect(
+      new HaHService(prisma, {} as any).createClinicalTask(
+        "episode-1",
+        {
+          title: "Catat tanda vital",
+          category: "VITALS",
+          priority: "URGENT",
+          assignedToHealthWorkerId: "worker-1",
+          dueAt: "2030-01-02T00:00:00Z",
+        },
+        "doctor-1",
+      ),
+    ).rejects.toThrow(/anggota tim perawatan aktif/i);
+  });
+
+  it("mewajibkan hasil dan handover sebelum tugas selesai", async () => {
+    const prisma: any = {
+      haHClinicalTask: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "task-1",
+          episodeId: "episode-1",
+          status: ClinicalTaskStatus.IN_PROGRESS,
+          assignedToHealthWorker: { userId: "nurse-1" },
+        }),
+      },
+    };
+
+    await expect(
+      new HaHService(prisma, {} as any).updateClinicalTask(
+        "task-1",
+        { status: "COMPLETED" },
+        { id: "nurse-1", role: "NURSE", roles: ["NURSE"] } as any,
+      ),
+    ).rejects.toThrow(/hasil tindakan wajib/i);
+  });
+
+  it("menyelesaikan tugas petugas yang ditugaskan dan mencatat audit", async () => {
+    const prisma: any = {
+      haHClinicalTask: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "task-1",
+          episodeId: "episode-1",
+          status: ClinicalTaskStatus.IN_PROGRESS,
+          assignedToHealthWorker: { userId: "nurse-1" },
+        }),
+        update: jest.fn().mockResolvedValue({
+          id: "task-1",
+          status: ClinicalTaskStatus.COMPLETED,
+        }),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+
+    const result = await new HaHService(prisma, {} as any).updateClinicalTask(
+      "task-1",
+      {
+        status: "COMPLETED",
+        outcomeNote: "Tanda vital stabil.",
+        handoverNote: "Lanjutkan monitoring sesuai jadwal.",
+      },
+      { id: "nurse-1", role: "NURSE", roles: ["NURSE"] } as any,
+    );
+
+    expect(result.status).toBe(ClinicalTaskStatus.COMPLETED);
+    expect(prisma.auditLog.create).toHaveBeenCalled();
   });
 });

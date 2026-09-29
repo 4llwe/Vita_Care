@@ -186,6 +186,31 @@ export class EndCareAssignmentDto {
   @IsString() @MinLength(5) reason!: string;
 }
 
+export class CreateClinicalTaskDto {
+  @IsString() @MinLength(3) title!: string;
+  @IsOptional() @IsString() description?: string;
+  @IsIn([
+    "ASSESSMENT",
+    "VITALS",
+    "MEDICATION",
+    "WOUND_CARE",
+    "EDUCATION",
+    "FOLLOW_UP",
+    "OTHER",
+  ])
+  category!: string;
+  @IsIn(["ROUTINE", "URGENT", "STAT"]) priority!: string;
+  @IsString() assignedToHealthWorkerId!: string;
+  @IsDateString() dueAt!: string;
+}
+
+export class UpdateClinicalTaskDto {
+  @IsIn(["IN_PROGRESS", "COMPLETED", "OMITTED", "CANCELLED"])
+  status!: string;
+  @IsOptional() @IsString() outcomeNote?: string;
+  @IsOptional() @IsString() handoverNote?: string;
+}
+
 export class CreateVisitDto {
   @IsString() healthWorkerId!: string;
   @IsString() visitType!: string;
