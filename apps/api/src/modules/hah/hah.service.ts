@@ -70,6 +70,7 @@ import {
   UpdateMedicationFulfillmentDto,
   UpdateVisitStatusDto,
   UpdateTeleconsultationDto,
+  UpsertDischargeChecklistDto,
 } from "./dto/hah.dto";
 import {
   ClinicalProtocolConfig,
@@ -556,7 +557,12 @@ export class HaHService {
 
   async dischargeReadiness(id: string) {
     await this.requireEpisode(id);
-    const [openAlerts, pendingDiagnostics, unacknowledgedCriticalResults] =
+    const [
+      openAlerts,
+      pendingDiagnostics,
+      unacknowledgedCriticalResults,
+      dischargeChecklist,
+    ] =
       await Promise.all([
         this.prisma.clinicalAlert.count({
           where: { episodeId: id, status: { not: ClinicalAlertStatus.RESOLVED } },
@@ -580,6 +586,9 @@ export class HaHService {
             acknowledgedAt: null,
           },
         }),
+        this.prisma.haHDischargeChecklist.findUnique({
+          where: { episodeId: id },
+        }),
       ]);
     const blockers: string[] = [];
     if (openAlerts) blockers.push(`${openAlerts} alert klinis belum selesai`);
@@ -589,13 +598,68 @@ export class HaHService {
       blockers.push(
         `${unacknowledgedCriticalResults} hasil kritis belum diakui dokter`,
       );
+    if (!dischargeChecklist)
+      blockers.push("checklist transisi pulang belum diselesaikan");
     return {
       ready: blockers.length === 0,
       blockers,
       openAlerts,
       pendingDiagnostics,
       unacknowledgedCriticalResults,
+      dischargeChecklistComplete: !!dischargeChecklist,
     };
+  }
+
+  async upsertDischargeChecklist(
+    episodeId: string,
+    dto: UpsertDischargeChecklistDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (
+      !(
+        [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException("Checklist hanya untuk episode aktif");
+    const requiredChecks = [
+      dto.medicationReconciled,
+      dto.pendingResultsReviewed,
+      dto.equipmentReturnPlanned,
+      dto.followUpBooked,
+      dto.redFlagsReviewed,
+      dto.caregiverTeachBackPassed,
+      dto.documentsDelivered,
+    ];
+    if (requiredChecks.some((value) => !value))
+      throw new BadRequestException(
+        "Seluruh item keselamatan discharge harus dikonfirmasi",
+      );
+    const followUpAt = new Date(dto.followUpAt);
+    if (followUpAt <= new Date())
+      throw new BadRequestException("Jadwal tindak lanjut harus di masa depan");
+    const checklist = await this.prisma.haHDischargeChecklist.upsert({
+      where: { episodeId },
+      create: {
+        episodeId,
+        ...dto,
+        followUpAt,
+        completedById: actorId,
+        completedAt: new Date(),
+      },
+      update: {
+        ...dto,
+        followUpAt,
+        completedById: actorId,
+        completedAt: new Date(),
+      },
+    });
+    await this.auditEpisodeEvent(actorId, "DISCHARGE_CHECKLIST_COMPLETED", episodeId, {
+      checklistId: checklist.id,
+      followUpAt: checklist.followUpAt.toISOString(),
+      followUpProvider: checklist.followUpProvider,
+    });
+    return checklist;
   }
 
   async recordObservation(id: string, dto: RecordObservationDto, actorId: string) {
@@ -2910,6 +2974,7 @@ export class HaHService {
         palliativeAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         educationRecords: { orderBy: { educatedAt: "desc" }, take: 200 },
         teleconsultations: { orderBy: { scheduledStart: "desc" }, take: 200 },
+        dischargeChecklist: true,
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,
@@ -2974,6 +3039,7 @@ export class HaHService {
       visible.palliativeAssessments = [];
       visible.educationRecords = [];
       visible.teleconsultations = [];
+      visible.dischargeChecklist = null;
     }
     if (!scope.includes("MEDICATIONS")) visible.medicationOrders = [];
     if (!scope.includes("DIAGNOSTICS")) visible.diagnosticOrders = [];

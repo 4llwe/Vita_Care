@@ -148,6 +148,22 @@ export class DischargeDto {
   @IsString() @MinLength(30) dischargeSummary!: string;
 }
 
+export class UpsertDischargeChecklistDto {
+  @IsBoolean() medicationReconciled!: boolean;
+  @IsString() @MinLength(10) medicationSummary!: string;
+  @IsBoolean() pendingResultsReviewed!: boolean;
+  @IsString() @MinLength(3) pendingResultsPlan!: string;
+  @IsBoolean() equipmentReturnPlanned!: boolean;
+  @IsString() @MinLength(3) equipmentReturnPlan!: string;
+  @IsBoolean() followUpBooked!: boolean;
+  @IsDateString() followUpAt!: string;
+  @IsString() @MinLength(2) followUpProvider!: string;
+  @IsBoolean() redFlagsReviewed!: boolean;
+  @IsBoolean() caregiverTeachBackPassed!: boolean;
+  @IsBoolean() documentsDelivered!: boolean;
+  @IsString() @MinLength(10) contactInstructions!: string;
+}
+
 export class CreateMedicationOrderDto {
   @IsString() @MinLength(2) medicationName!: string;
   @IsString() dose!: string;

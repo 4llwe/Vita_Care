@@ -180,5 +180,11 @@
 - Escalation identified during teleconsultation requires a documented escalation plan and creates a high-priority clinical alert.
 - Teleconsultation records follow controlled lifecycle transitions, episode access, caregiver care-plan consent, and audit trails; emergency pathways remain separate and prominent.
 
+## Phase 2.15 — safe discharge transition
+- Added an episode-level discharge checklist that must be completed before a clinician can mark the patient discharge-ready or complete discharge.
+- Requires medication reconciliation, pending-result review, equipment-return planning, booked follow-up, red-flag education, successful patient/caregiver teach-back, delivered documents, and contact instructions.
+- Follow-up must name the provider and use a future appointment time; checklist completion is written to the episode audit trail.
+- Existing alert, diagnostic, critical-result, care-plan, and physician-evaluation blockers remain enforced alongside the new transition checklist.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

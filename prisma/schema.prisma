@@ -899,12 +899,36 @@ model HaHEpisode {
   palliativeAssessments  HaHPalliativeAssessment[]
   educationRecords       HaHEducationRecord[]
   teleconsultations      HaHTeleconsultation[]
+  dischargeChecklist     HaHDischargeChecklist?
   messages               HaHClinicalMessage[]
   breakGlassAccesses     HaHBreakGlassAccess[]
   careAssignments       CareAssignment[]
 
   @@index([status, createdAt])
   @@index([patientId, createdAt])
+}
+
+model HaHDischargeChecklist {
+  id                       String     @id @default(cuid())
+  episodeId                String     @unique
+  episode                  HaHEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  medicationReconciled     Boolean    @default(false)
+  medicationSummary        String
+  pendingResultsReviewed   Boolean    @default(false)
+  pendingResultsPlan       String
+  equipmentReturnPlanned   Boolean    @default(false)
+  equipmentReturnPlan      String
+  followUpBooked           Boolean    @default(false)
+  followUpAt               DateTime
+  followUpProvider         String
+  redFlagsReviewed         Boolean    @default(false)
+  caregiverTeachBackPassed Boolean    @default(false)
+  documentsDelivered       Boolean    @default(false)
+  contactInstructions      String
+  completedById            String
+  completedAt              DateTime
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
 }
 
 model HaHTeleconsultation {
