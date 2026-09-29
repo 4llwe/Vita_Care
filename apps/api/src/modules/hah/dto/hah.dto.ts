@@ -164,6 +164,22 @@ export class UpsertDischargeChecklistDto {
   @IsString() @MinLength(10) contactInstructions!: string;
 }
 
+export class CreatePostDischargeFollowUpDto {
+  @IsDateString() scheduledAt!: string;
+  @IsIn(["REACHED", "NOT_REACHED", "RESCHEDULED"]) outcome!: string;
+  @IsOptional() @IsString() respondent?: string;
+  @IsOptional() @IsString() symptomUpdate?: string;
+  @IsOptional() @IsBoolean() medicationAvailable?: boolean;
+  @IsOptional() @IsString() medicationQuestions?: string;
+  @IsOptional() @IsBoolean() followUpAttended?: boolean;
+  @IsOptional() @IsString() newCareNeeds?: string;
+  @IsIn(["STABLE", "CONCERNING", "EMERGENCY"]) clinicalStatus!: string;
+  @IsBoolean() escalationRequired!: boolean;
+  @IsOptional() @IsString() escalationPlan?: string;
+  @IsOptional() @IsString() advice?: string;
+  @IsOptional() @IsDateString() nextContactAt?: string;
+}
+
 export class CreateMedicationOrderDto {
   @IsString() @MinLength(2) medicationName!: string;
   @IsString() dose!: string;

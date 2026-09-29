@@ -186,5 +186,11 @@
 - Follow-up must name the provider and use a future appointment time; checklist completion is written to the episode audit trail.
 - Existing alert, diagnostic, critical-result, care-plan, and physician-evaluation blockers remain enforced alongside the new transition checklist.
 
+## Phase 2.16 — post-discharge follow-up and early escalation
+- Added structured follow-up contacts for discharged episodes, including contact outcome, respondent, symptom update, medication access/questions, attended appointments, and new care needs.
+- Failed or rescheduled contact attempts require a future contact time, preventing silent loss to follow-up.
+- Concerning or emergency clinical status creates a high/critical alert with response timing; explicit escalation requires a documented plan.
+- Follow-up records remain linked to the episode and follow existing caregiver care-plan consent and audit controls.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

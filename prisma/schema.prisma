@@ -808,6 +808,18 @@ enum TeleconsultationStatus {
   NO_SHOW
 }
 
+enum PostDischargeOutcome {
+  REACHED
+  NOT_REACHED
+  RESCHEDULED
+}
+
+enum PostDischargeClinicalStatus {
+  STABLE
+  CONCERNING
+  EMERGENCY
+}
+
 enum ClinicalTaskCategory {
   ASSESSMENT
   VITALS
@@ -900,12 +912,38 @@ model HaHEpisode {
   educationRecords       HaHEducationRecord[]
   teleconsultations      HaHTeleconsultation[]
   dischargeChecklist     HaHDischargeChecklist?
+  postDischargeFollowUps HaHPostDischargeFollowUp[]
   messages               HaHClinicalMessage[]
   breakGlassAccesses     HaHBreakGlassAccess[]
   careAssignments       CareAssignment[]
 
   @@index([status, createdAt])
   @@index([patientId, createdAt])
+}
+
+model HaHPostDischargeFollowUp {
+  id                    String                      @id @default(cuid())
+  episodeId             String
+  episode               HaHEpisode                  @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  scheduledAt           DateTime
+  contactedAt           DateTime                    @default(now())
+  outcome               PostDischargeOutcome
+  respondent            String?
+  symptomUpdate         String?
+  medicationAvailable   Boolean?
+  medicationQuestions   String?
+  followUpAttended      Boolean?
+  newCareNeeds          String?
+  clinicalStatus        PostDischargeClinicalStatus
+  escalationRequired    Boolean                     @default(false)
+  escalationPlan        String?
+  advice                String?
+  nextContactAt         DateTime?
+  contactedById         String
+  createdAt             DateTime                    @default(now())
+
+  @@index([episodeId, contactedAt])
+  @@index([clinicalStatus, escalationRequired, nextContactAt])
 }
 
 model HaHDischargeChecklist {

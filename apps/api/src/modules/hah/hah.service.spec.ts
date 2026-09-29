@@ -9,6 +9,7 @@ import {
   FallRiskLevel,
   NutritionRiskLevel,
   TeleconsultationStatus,
+  PostDischargeClinicalStatus,
 } from "@prisma/client";
 import { HaHService } from "./hah.service";
 
@@ -1025,5 +1026,73 @@ describe("HaHService teleconsultation workflow", () => {
     );
     expect(prisma.clinicalAlert.create).toHaveBeenCalled();
     expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});
+
+describe("HaHService post-discharge follow-up workflow", () => {
+  it("mewajibkan jadwal ulang jika pasien tidak terhubung", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          status: HaHEpisodeStatus.DISCHARGED,
+        }),
+      },
+    };
+    await expect(
+      new HaHService(prisma, {} as any).createPostDischargeFollowUp(
+        "episode-1",
+        {
+          scheduledAt: "2029-01-01T08:00:00Z",
+          outcome: "NOT_REACHED",
+          clinicalStatus: "STABLE",
+          escalationRequired: false,
+        },
+        "nurse-1",
+      ),
+    ).rejects.toThrow(/jadwal kontak berikutnya wajib/i);
+  });
+
+  it("membuat alert kritis untuk status darurat pasca-discharge", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          code: "HAH-001",
+          status: HaHEpisodeStatus.DISCHARGED,
+        }),
+      },
+      haHPostDischargeFollowUp: {
+        create: jest.fn().mockImplementation(({ data }) =>
+          Promise.resolve({ id: "followup-1", ...data }),
+        ),
+      },
+      clinicalAlert: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const notify = { enqueueClinical: jest.fn().mockResolvedValue({}) };
+    const result = await new HaHService(
+      prisma,
+      notify as any,
+    ).createPostDischargeFollowUp(
+      "episode-1",
+      {
+        scheduledAt: "2029-01-01T08:00:00Z",
+        outcome: "REACHED",
+        respondent: "Pasien",
+        symptomUpdate: "Sesak berat baru",
+        clinicalStatus: "EMERGENCY",
+        escalationRequired: true,
+        escalationPlan: "Aktifkan layanan darurat dan rujuk",
+      },
+      "nurse-1",
+    );
+    expect(result.clinicalStatus).toBe(PostDischargeClinicalStatus.EMERGENCY);
+    expect(prisma.clinicalAlert.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ severity: "CRITICAL" }),
+      }),
+    );
+    expect(notify.enqueueClinical).toHaveBeenCalled();
   });
 });
