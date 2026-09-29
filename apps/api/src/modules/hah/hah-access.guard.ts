@@ -185,6 +185,10 @@ export class HaHAccessGuard implements CanActivate {
       const profession = profile.profession.toLowerCase();
       const isDoctor = actorHasAnyRole(user, ["DOCTOR"]) || profession.includes("dokter");
       const isNurse = actorHasAnyRole(user, ["NURSE"]) || profession.includes("perawat") || profession.includes("bidan");
+      const isDiagnosticProfessional =
+        profession.includes("laboratorium") ||
+        profession.includes("analis") ||
+        profession.includes("patologi");
       const doctorOnly = [
         "eligibility",
         "admit",
@@ -192,15 +196,27 @@ export class HaHAccessGuard implements CanActivate {
         "evaluations",
         "alerts/:id/resolve",
         "discharge",
-        "diagnostics",
-        "diagnostics/:id/result",
+        "episodes/:id/diagnostics",
         "diagnostics/:id/acknowledge",
         "episodes/:id/medications",
         "medications/:id/status",
       ].some((segment) => path.includes(segment));
       if (doctorOnly && !isDoctor)
         throw new ForbiddenException("Tindakan ini memerlukan kewenangan dokter");
-      if (!doctorOnly && !isDoctor && !isNurse)
+      if (
+        path.includes("diagnostics/:id/result") &&
+        !isDoctor &&
+        !isDiagnosticProfessional
+      )
+        throw new ForbiddenException(
+          "Input hasil memerlukan kewenangan dokter atau tenaga laboratorium",
+        );
+      if (
+        !doctorOnly &&
+        !isDoctor &&
+        !isNurse &&
+        !isDiagnosticProfessional
+      )
         throw new ForbiddenException("Tindakan klinis memerlukan kewenangan yang sesuai");
     }
     return true;

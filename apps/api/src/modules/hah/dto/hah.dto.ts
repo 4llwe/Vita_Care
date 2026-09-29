@@ -231,8 +231,21 @@ export class CreateDiagnosticOrderDto {
   @IsIn(["ROUTINE", "URGENT", "STAT"]) priority!: string;
 }
 export class DiagnosticResultDto {
-  @IsString() @MinLength(1) resultText!: string;
+  @IsOptional() @IsString() resultValue?: string;
+  @IsOptional() @IsString() resultUnit?: string;
+  @IsOptional() @IsString() referenceRange?: string;
+  @IsIn(["NORMAL", "LOW", "HIGH", "ABNORMAL", "INDETERMINATE"])
+  resultFlag!: string;
+  @IsString() @MinLength(3) resultText!: string;
   @IsBoolean() criticalResult!: boolean;
+}
+export class UpdateDiagnosticStatusDto {
+  @IsIn(["COLLECTED", "PROCESSING", "CANCELLED"]) status!: string;
+  @IsOptional() @IsString() collectionNote?: string;
+  @IsOptional() @IsString() cancellationReason?: string;
+}
+export class AcknowledgeDiagnosticDto {
+  @IsString() @MinLength(3) acknowledgementNote!: string;
 }
 export class CreateEquipmentAssignmentDto {
   @IsString() equipmentType!: string;

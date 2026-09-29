@@ -944,29 +944,42 @@ export default function EpisodePage() {
                   {o.status === "ORDERED" && (
                     <button
                       className="mt-2 rounded border px-3 py-2"
-                      onClick={() => {
-                        const result = window.prompt("Masukkan hasil");
-                        if (result)
-                          patch(`/hah/diagnostics/${o.id}/result`, {
-                            resultText: result,
-                            criticalResult: window.confirm(
-                              "Apakah hasil kritis?",
-                            ),
-                          });
-                      }}
+                      onClick={() =>
+                        patch(`/hah/diagnostics/${o.id}/status`, {
+                          status: "COLLECTED",
+                        })
+                      }
                     >
-                      Input hasil
+                      Tandai spesimen dikoleksi
                     </button>
                   )}
-                  {o.status === "RESULTED" && (
+                  {o.status === "COLLECTED" && (
                     <button
                       className="mt-2 rounded border px-3 py-2"
                       onClick={() =>
-                        patch(`/hah/diagnostics/${o.id}/acknowledge`)
+                        patch(`/hah/diagnostics/${o.id}/status`, {
+                          status: "PROCESSING",
+                        })
                       }
                     >
-                      Acknowledge hasil
+                      Mulai pemrosesan
                     </button>
+                  )}
+                  {["COLLECTED", "PROCESSING"].includes(o.status) && (
+                    <a
+                      href="/diagnostics"
+                      className="ml-2 mt-2 inline-flex min-h-11 items-center rounded border px-3 py-2 font-semibold text-blue-700"
+                    >
+                      Input hasil terstruktur
+                    </a>
+                  )}
+                  {o.status === "RESULTED" && (
+                    <a
+                      href="/diagnostics"
+                      className="mt-2 inline-flex min-h-11 items-center rounded border px-3 py-2 font-semibold text-blue-700"
+                    >
+                      Review dan acknowledge
+                    </a>
                   )}
                 </div>
               ))}
