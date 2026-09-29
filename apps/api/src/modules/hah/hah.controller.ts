@@ -54,6 +54,7 @@ import {
   ResolveEmergencyEventDto,
   SendClinicalMessageDto,
   TransferDto,
+  UpdateTransferDto,
   UpdateEquipmentStatusDto,
   UpdateDiagnosticStatusDto,
   UpdateClinicalTaskDto,
@@ -196,10 +197,14 @@ export class HaHController {
     return this.hah.transfer(id, dto, u.id);
   }
 
-  @Patch("transfers/:id/arrive")
+  @Patch("transfers/:id")
   @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
-  completeTransfer(@Param("id") id: string) {
-    return this.hah.completeTransfer(id);
+  updateTransfer(
+    @Param("id") id: string,
+    @Body() dto: UpdateTransferDto,
+    @CurrentUser() actor: { id: string },
+  ) {
+    return this.hah.updateTransfer(id, dto, actor.id);
   }
 
   @Post("episodes/:id/discharge")

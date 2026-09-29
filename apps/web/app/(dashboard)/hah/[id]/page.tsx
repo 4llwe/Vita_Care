@@ -1739,16 +1739,26 @@ export default function EpisodePage() {
                   const f = new FormData(e.currentTarget);
                   submit(`/hah/episodes/${id}/transfer`, {
                     destination: f.get("destination"),
+                    destinationUnit: f.get("destinationUnit") || undefined,
                     reason: f.get("reason"),
                     urgency: f.get("urgency"),
                     sbarHandover: f.get("sbarHandover"),
+                    latestClinicalStatus: f.get("latestClinicalStatus"),
+                    medicationSummary: f.get("transferMedicationSummary"),
+                    risksPrecautions: f.get("risksPrecautions"),
+                    familyNotified: f.get("familyNotified") === "on",
                     transportProvider: f.get("transportProvider") || undefined,
                   });
                 }}
               >
-                <Field label="Tujuan">
-                  <input name="destination" required className={input} />
-                </Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="RS / faskes tujuan">
+                    <input name="destination" required className={input} />
+                  </Field>
+                  <Field label="Unit tujuan (bila diketahui)">
+                    <input name="destinationUnit" className={input} />
+                  </Field>
+                </div>
                 <Field label="Urgensi">
                   <select name="urgency" className={input}>
                     <option>URGENT</option>
@@ -1766,9 +1776,39 @@ export default function EpisodePage() {
                     className={input}
                   />
                 </Field>
+                <Field label="Status klinis terkini">
+                  <textarea
+                    name="latestClinicalStatus"
+                    minLength={10}
+                    required
+                    className={input}
+                  />
+                </Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Ringkasan obat">
+                    <textarea
+                      name="transferMedicationSummary"
+                      minLength={5}
+                      required
+                      className={input}
+                    />
+                  </Field>
+                  <Field label="Risiko / tindakan pencegahan">
+                    <textarea
+                      name="risksPrecautions"
+                      minLength={5}
+                      required
+                      className={input}
+                    />
+                  </Field>
+                </div>
                 <Field label="Transportasi">
                   <input name="transportProvider" className={input} />
                 </Field>
+                <label className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+                  <input name="familyNotified" type="checkbox" />
+                  Keluarga/caregiver telah diberi tahu
+                </label>
                 <button
                   disabled={busy}
                   className="min-h-11 rounded-lg bg-red-600 px-4 font-semibold text-white"
@@ -1776,6 +1816,146 @@ export default function EpisodePage() {
                   Minta transfer
                 </button>
               </form>
+              {d.transfers?.length ? (
+                <div className="space-y-3 border-t pt-4">
+                  <h3 className="font-bold text-slate-900">
+                    Perjalanan rujukan
+                  </h3>
+                  {d.transfers.map((transfer: any) => (
+                    <article
+                      key={transfer.id}
+                      className="space-y-3 rounded-xl border border-slate-200 p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <strong>{transfer.destination}</strong>
+                          {transfer.destinationUnit
+                            ? ` · ${transfer.destinationUnit}`
+                            : ""}
+                          <p className="text-sm text-slate-600">
+                            {transfer.reason}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800">
+                          {transfer.status.replaceAll("_", " ")}
+                        </span>
+                      </div>
+                      <details className="rounded-lg bg-slate-50 p-3 text-sm">
+                        <summary className="cursor-pointer font-semibold">
+                          Ringkasan handover klinis
+                        </summary>
+                        <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+                          <div><dt className="font-semibold">SBAR</dt><dd>{transfer.sbarHandover}</dd></div>
+                          <div><dt className="font-semibold">Status klinis</dt><dd>{transfer.latestClinicalStatus}</dd></div>
+                          <div><dt className="font-semibold">Obat</dt><dd>{transfer.medicationSummary}</dd></div>
+                          <div><dt className="font-semibold">Risiko</dt><dd>{transfer.risksPrecautions}</dd></div>
+                        </dl>
+                      </details>
+                      {transfer.status === "REQUESTED" && (
+                        <div className="grid gap-3 lg:grid-cols-2">
+                          <form
+                            className="space-y-2 rounded-lg bg-emerald-50 p-3"
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              const f = new FormData(e.currentTarget);
+                              patch(`/hah/transfers/${transfer.id}`, {
+                                status: "ACCEPTED",
+                                receivingContact: f.get("receivingContact"),
+                                acceptingClinician: f.get("acceptingClinician"),
+                                destinationUnit: f.get("acceptedUnit") || undefined,
+                              });
+                            }}
+                          >
+                            <strong className="text-sm">Konfirmasi penerimaan</strong>
+                            <input name="receivingContact" required placeholder="Kontak penerima" className={input} />
+                            <input name="acceptingClinician" required placeholder="Klinisi penerima" className={input} />
+                            <input name="acceptedUnit" placeholder="Unit / ruang" className={input} />
+                            <button className={btn} disabled={busy}>Diterima faskes</button>
+                          </form>
+                          <form
+                            className="space-y-2 rounded-lg bg-red-50 p-3"
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              const f = new FormData(e.currentTarget);
+                              patch(`/hah/transfers/${transfer.id}`, {
+                                status: "REJECTED",
+                                rejectionReason: f.get("rejectionReason"),
+                              });
+                            }}
+                          >
+                            <strong className="text-sm">Penolakan faskes</strong>
+                            <textarea name="rejectionReason" required minLength={5} placeholder="Alasan penolakan dan kebutuhan alternatif" className={input} />
+                            <button className="min-h-11 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white" disabled={busy}>Catat penolakan</button>
+                          </form>
+                        </div>
+                      )}
+                      {transfer.status === "ACCEPTED" && (
+                        <form
+                          className="grid gap-2 rounded-lg bg-amber-50 p-3 sm:grid-cols-2"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const f = new FormData(e.currentTarget);
+                            patch(`/hah/transfers/${transfer.id}`, {
+                              status: "DEPARTED",
+                              transportProvider: f.get("departureTransport"),
+                              transportReference: f.get("transportReference"),
+                            });
+                          }}
+                        >
+                          <input name="departureTransport" required defaultValue={transfer.transportProvider ?? ""} placeholder="Penyedia transportasi" className={input} />
+                          <input name="transportReference" required placeholder="Nomor ambulans / referensi" className={input} />
+                          <button className={`${btn} sm:col-span-2`} disabled={busy}>Konfirmasi keberangkatan</button>
+                        </form>
+                      )}
+                      {transfer.status === "DEPARTED" && (
+                        <form
+                          className="grid gap-2 rounded-lg bg-blue-50 p-3 sm:grid-cols-2"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const f = new FormData(e.currentTarget);
+                            patch(`/hah/transfers/${transfer.id}`, {
+                              status: "ARRIVED",
+                              receivedBy: f.get("receivedBy"),
+                              arrivalHandoverNote: f.get("arrivalHandoverNote"),
+                            });
+                          }}
+                        >
+                          <input name="receivedBy" required placeholder="Nama penerima pasien" className={input} />
+                          <textarea name="arrivalHandoverNote" required minLength={5} placeholder="Konfirmasi handover saat tiba" className={input} />
+                          <button className={`${btn} sm:col-span-2`} disabled={busy}>Pasien tiba dan diterima</button>
+                        </form>
+                      )}
+                      {["REQUESTED", "ACCEPTED"].includes(transfer.status) && (
+                        <form
+                          className="flex flex-col gap-2 rounded-lg border border-red-100 p-3 sm:flex-row"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const f = new FormData(e.currentTarget);
+                            patch(`/hah/transfers/${transfer.id}`, {
+                              status: "CANCELLED",
+                              cancellationReason: f.get("cancellationReason"),
+                            });
+                          }}
+                        >
+                          <input
+                            name="cancellationReason"
+                            required
+                            minLength={5}
+                            placeholder="Alasan pembatalan dan rencana alternatif"
+                            className={input}
+                          />
+                          <button
+                            className="min-h-11 shrink-0 rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700"
+                            disabled={busy}
+                          >
+                            Batalkan transfer
+                          </button>
+                        </form>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              ) : null}
               <form
                 className="space-y-3 border-t pt-4"
                 onSubmit={(e: FormEvent<HTMLFormElement>) => {

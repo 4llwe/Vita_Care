@@ -198,5 +198,11 @@
 - Only the assigned worker or an authorized doctor/coordinator may update a visit, and every transition is audited.
 - Cancellation requires a reason; near-term cancellation creates a clinical alert and team notification so the visit is actively rescheduled.
 
+## Phase 2.18 — hospital referral and structured clinical handoff
+- Extended the existing episode transfer workflow with controlled request, acceptance, departure, arrival, rejection, and cancellation states.
+- Transfer requests carry SBAR, current clinical status, medication summary, risks/precautions, family notification, destination, and urgency.
+- Acceptance identifies the receiving contact and clinician; departure records transport identity; arrival requires a named receiver and handoff confirmation.
+- Rejected or cancelled transfers return the episode to active care, notify the team to arrange an alternative, and preserve every transition in the clinical audit trail.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

@@ -136,11 +136,30 @@ export class ResolveAlertDto {
 }
 
 export class TransferDto {
-  @IsString() destination!: string;
+  @IsString() @MinLength(2) destination!: string;
+  @IsOptional() @IsString() destinationUnit?: string;
   @IsString() @MinLength(5) reason!: string;
   @IsIn(["URGENT", "EMERGENCY"]) urgency!: string;
   @IsString() @MinLength(20) sbarHandover!: string;
+  @IsString() @MinLength(10) latestClinicalStatus!: string;
+  @IsString() @MinLength(5) medicationSummary!: string;
+  @IsString() @MinLength(5) risksPrecautions!: string;
+  @IsBoolean() familyNotified!: boolean;
   @IsOptional() @IsString() transportProvider?: string;
+}
+
+export class UpdateTransferDto {
+  @IsIn(["ACCEPTED", "REJECTED", "DEPARTED", "ARRIVED", "CANCELLED"])
+  status!: "ACCEPTED" | "REJECTED" | "DEPARTED" | "ARRIVED" | "CANCELLED";
+  @IsOptional() @IsString() receivingContact?: string;
+  @IsOptional() @IsString() acceptingClinician?: string;
+  @IsOptional() @IsString() destinationUnit?: string;
+  @IsOptional() @IsString() transportProvider?: string;
+  @IsOptional() @IsString() transportReference?: string;
+  @IsOptional() @IsString() receivedBy?: string;
+  @IsOptional() @IsString() arrivalHandoverNote?: string;
+  @IsOptional() @IsString() rejectionReason?: string;
+  @IsOptional() @IsString() cancellationReason?: string;
 }
 
 export class DischargeDto {

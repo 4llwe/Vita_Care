@@ -5,6 +5,7 @@ import {
   DiagnosticOrderStatus,
   HaHEpisodeStatus,
   HaHVisitStatus,
+  HaHTransferStatus,
   PharmacyFulfillmentStatus,
   WoundProgress,
   FallRiskLevel,
@@ -119,6 +120,72 @@ describe("HaHService discharge safety", () => {
       "nurse-1",
     );
     expect(result.id).toBe("checklist-1");
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});
+
+describe("HaHService safe transfer handoff", () => {
+  const notify = { enqueue: jest.fn().mockResolvedValue({}) };
+
+  it("mewajibkan identitas klinisi dan kontak penerima saat transfer diterima", async () => {
+    const prisma: any = {
+      haHTransfer: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "transfer-1",
+          episodeId: "episode-1",
+          destination: "RS Mitra",
+          status: HaHTransferStatus.REQUESTED,
+        }),
+      },
+    };
+    await expect(
+      new HaHService(prisma, notify as any).updateTransfer(
+        "transfer-1",
+        { status: "ACCEPTED" },
+        "coordinator-1",
+      ),
+    ).rejects.toThrow(/kontak penerima wajib/i);
+  });
+
+  it("mencatat kedatangan, menutup transfer, dan mengaudit handoff", async () => {
+    const updated = {
+      id: "transfer-1",
+      status: HaHTransferStatus.ARRIVED,
+    };
+    const prisma: any = {
+      haHTransfer: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "transfer-1",
+          episodeId: "episode-1",
+          destination: "RS Mitra",
+          status: HaHTransferStatus.DEPARTED,
+        }),
+        update: jest.fn().mockResolvedValue(updated),
+      },
+      haHEpisode: { update: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+      $transaction: jest
+        .fn()
+        .mockImplementation((operations) => Promise.all(operations)),
+    };
+    const result = await new HaHService(
+      prisma,
+      notify as any,
+    ).updateTransfer(
+      "transfer-1",
+      {
+        status: "ARRIVED",
+        receivedBy: "Perawat IGD",
+        arrivalHandoverNote: "SBAR diterima dan pasien masuk ruang observasi",
+      },
+      "nurse-1",
+    );
+    expect(result.status).toBe(HaHTransferStatus.ARRIVED);
+    expect(prisma.haHEpisode.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: HaHEpisodeStatus.TRANSFERRED },
+      }),
+    );
     expect(prisma.auditLog.create).toHaveBeenCalled();
   });
 });
