@@ -853,6 +853,64 @@ export default function EpisodePage() {
                 </div>
               ))}
             </Panel>
+            <Panel title="Perawatan paliatif & tujuan perawatan">
+              <form
+                className="space-y-3"
+                onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  submit(`/hah/episodes/${id}/palliative-assessments`, {
+                    ppsScore: Number(f.get("ppsScore")),
+                    painScore: Number(f.get("palliativePain")),
+                    dyspneaScore: Number(f.get("dyspneaScore")),
+                    nauseaScore: Number(f.get("nauseaScore")),
+                    anxietyScore: Number(f.get("anxietyScore")),
+                    consciousnessNotes: f.get("consciousnessNotes"),
+                    otherSymptoms: f.get("otherSymptoms") || undefined,
+                    goalsOfCare: f.get("goalsOfCare"),
+                    preferredPlaceOfCare: f.get("preferredPlaceOfCare"),
+                    escalationPreferences: f.get("escalationPreferences"),
+                    comfortPlan: f.get("comfortPlan"),
+                    familyDiscussionSummary:
+                      f.get("familyDiscussionSummary") || undefined,
+                    spiritualPsychosocialNeed:
+                      f.get("spiritualPsychosocialNeed") || undefined,
+                    nextReviewAt: new Date(
+                      String(f.get("palliativeReviewAt")),
+                    ).toISOString(),
+                  });
+                }}
+              >
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field label="PPS 0–100"><input name="ppsScore" type="number" min="0" max="100" step="10" required className={input} /></Field>
+                  <Field label="Nyeri 0–10"><input name="palliativePain" type="number" min="0" max="10" required className={input} /></Field>
+                  <Field label="Sesak 0–10"><input name="dyspneaScore" type="number" min="0" max="10" required className={input} /></Field>
+                  <Field label="Mual 0–10"><input name="nauseaScore" type="number" min="0" max="10" required className={input} /></Field>
+                  <Field label="Kecemasan 0–10"><input name="anxietyScore" type="number" min="0" max="10" required className={input} /></Field>
+                </div>
+                <Field label="Kesadaran/kognisi"><input name="consciousnessNotes" required className={input} /></Field>
+                <Field label="Gejala lain"><textarea name="otherSymptoms" className={input} /></Field>
+                <Field label="Tujuan perawatan"><textarea name="goalsOfCare" required className={input} /></Field>
+                <Field label="Tempat perawatan yang diutamakan"><input name="preferredPlaceOfCare" required className={input} /></Field>
+                <Field label="Preferensi eskalasi dan rujukan"><textarea name="escalationPreferences" required className={input} /></Field>
+                <Field label="Rencana kenyamanan"><textarea name="comfortPlan" required className={input} /></Field>
+                <Field label="Ringkasan diskusi keluarga"><textarea name="familyDiscussionSummary" className={input} /></Field>
+                <Field label="Kebutuhan psikososial/spiritual"><textarea name="spiritualPsychosocialNeed" className={input} /></Field>
+                <Field label="Review berikutnya"><input name="palliativeReviewAt" type="datetime-local" required className={input} /></Field>
+                <button className={btn} disabled={busy}>Simpan asesmen paliatif</button>
+              </form>
+              {d.palliativeAssessments?.map((p: any) => {
+                const severe = Math.max(p.painScore, p.dyspneaScore, p.nauseaScore, p.anxietyScore) >= 7;
+                return (
+                  <div key={p.id} className={`rounded-xl border p-3 text-sm ${severe ? "border-red-300 bg-red-50" : "bg-slate-50"}`}>
+                    <strong>PPS {p.ppsScore}</strong> · Nyeri {p.painScore} · Sesak {p.dyspneaScore} · Mual {p.nauseaScore} · Cemas {p.anxietyScore}
+                    <p className="mt-1"><b>Tujuan:</b> {p.goalsOfCare}</p>
+                    <p className="mt-1"><b>Kenyamanan:</b> {p.comfortPlan}</p>
+                    <p className="mt-1 text-xs text-slate-500">Review {new Date(p.nextReviewAt).toLocaleString("id-ID")}</p>
+                  </div>
+                );
+              })}
+            </Panel>
             <Panel title="Asesmen nutrisi & intervensi gizi">
               <form
                 className="space-y-3"
