@@ -156,5 +156,11 @@
 - High nutrition risk, intake below 50%, or swallowing difficulty creates a high-priority clinical alert for multidisciplinary review without generating an automatic diagnosis.
 - Nutrition records follow existing episode access, caregiver care-plan consent, and clinical audit trails.
 
+## Phase 2.11 — palliative symptom and goals-of-care workflow
+- Added longitudinal palliative assessments covering PPS, pain, dyspnea, nausea, anxiety, consciousness, and other symptom burden.
+- Goals of care, preferred place of care, escalation preferences, comfort plan, family discussion, psychosocial/spiritual needs, and review dates remain attached to the episode.
+- Any symptom score of 7 or above creates a high-priority clinical alert for timely team review; the system does not prescribe treatment or override emergency pathways.
+- Palliative documentation follows existing episode access, caregiver care-plan consent, and clinical audit trails.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

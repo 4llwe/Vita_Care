@@ -876,12 +876,39 @@ model HaHEpisode {
   woundAssessments       HaHWoundAssessment[]
   functionalAssessments  HaHFunctionalAssessment[]
   nutritionAssessments   HaHNutritionAssessment[]
+  palliativeAssessments  HaHPalliativeAssessment[]
   messages               HaHClinicalMessage[]
   breakGlassAccesses     HaHBreakGlassAccess[]
   careAssignments       CareAssignment[]
 
   @@index([status, createdAt])
   @@index([patientId, createdAt])
+}
+
+model HaHPalliativeAssessment {
+  id                       String      @id @default(cuid())
+  episodeId                String
+  episode                  HaHEpisode  @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  ppsScore                 Int
+  painScore                Int
+  dyspneaScore             Int
+  nauseaScore              Int
+  anxietyScore             Int
+  consciousnessNotes       String
+  otherSymptoms            String?
+  goalsOfCare              String
+  preferredPlaceOfCare     String
+  escalationPreferences    String
+  comfortPlan              String
+  familyDiscussionSummary  String?
+  spiritualPsychosocialNeed String?
+  nextReviewAt             DateTime
+  assessedById             String
+  assessedAt               DateTime    @default(now())
+  createdAt                DateTime    @default(now())
+
+  @@index([episodeId, assessedAt])
+  @@index([painScore, dyspneaScore, nextReviewAt])
 }
 
 model HaHNutritionAssessment {

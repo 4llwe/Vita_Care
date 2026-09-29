@@ -49,6 +49,7 @@ import {
   CreateWoundAssessmentDto,
   CreateFunctionalAssessmentDto,
   CreateNutritionAssessmentDto,
+  CreatePalliativeAssessmentDto,
   DiagnosticResultDto,
   DischargeDto,
   EndCareAssignmentDto,
@@ -1653,6 +1654,79 @@ export class HaHService {
     return assignment;
   }
 
+  listPalliativeAssessments(episodeId: string) {
+    return this.prisma.haHPalliativeAssessment.findMany({
+      where: { episodeId },
+      orderBy: { assessedAt: "desc" },
+      take: 200,
+    });
+  }
+
+  async createPalliativeAssessment(
+    episodeId: string,
+    dto: CreatePalliativeAssessmentDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (
+      !(
+        [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException("Asesmen paliatif memerlukan episode aktif");
+    const nextReviewAt = new Date(dto.nextReviewAt);
+    if (nextReviewAt <= new Date())
+      throw new BadRequestException("Review paliatif harus di masa depan");
+    const assessment = await this.prisma.haHPalliativeAssessment.create({
+      data: {
+        episodeId,
+        ppsScore: dto.ppsScore,
+        painScore: dto.painScore,
+        dyspneaScore: dto.dyspneaScore,
+        nauseaScore: dto.nauseaScore,
+        anxietyScore: dto.anxietyScore,
+        consciousnessNotes: dto.consciousnessNotes.trim(),
+        otherSymptoms: dto.otherSymptoms?.trim() || null,
+        goalsOfCare: dto.goalsOfCare.trim(),
+        preferredPlaceOfCare: dto.preferredPlaceOfCare.trim(),
+        escalationPreferences: dto.escalationPreferences.trim(),
+        comfortPlan: dto.comfortPlan.trim(),
+        familyDiscussionSummary: dto.familyDiscussionSummary?.trim() || null,
+        spiritualPsychosocialNeed:
+          dto.spiritualPsychosocialNeed?.trim() || null,
+        nextReviewAt,
+        assessedById: actorId,
+      },
+    });
+    const severeSymptoms = [
+      dto.painScore,
+      dto.dyspneaScore,
+      dto.nauseaScore,
+      dto.anxietyScore,
+    ].some((score) => score >= 7);
+    if (severeSymptoms) {
+      await this.prisma.clinicalAlert.create({
+        data: {
+          episodeId,
+          severity: ClinicalAlertSeverity.HIGH,
+          trigger: "Gejala paliatif berat memerlukan review",
+          responseDueAt: new Date(Date.now() + 60 * 60_000),
+        },
+      });
+      await this.notify.enqueue({
+        channel: "in-app",
+        title: "Gejala paliatif berat",
+        body: `${episode.code}: diperlukan review rencana kenyamanan dan eskalasi`,
+      });
+    }
+    await this.auditEpisodeEvent(actorId, "PALLIATIVE_ASSESSMENT_RECORDED", episodeId, {
+      palliativeAssessmentId: assessment.id,
+      ppsScore: assessment.ppsScore,
+      severeSymptoms,
+    });
+    return assessment;
+  }
+
   listNutritionAssessments(episodeId: string) {
     return this.prisma.haHNutritionAssessment.findMany({
       where: { episodeId },
@@ -2533,6 +2607,7 @@ export class HaHService {
         woundAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         functionalAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         nutritionAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
+        palliativeAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,
@@ -2591,6 +2666,7 @@ export class HaHService {
       visible.woundAssessments = [];
       visible.functionalAssessments = [];
       visible.nutritionAssessments = [];
+      visible.palliativeAssessments = [];
     }
     if (!scope.includes("MEDICATIONS")) visible.medicationOrders = [];
     if (!scope.includes("DIAGNOSTICS")) visible.diagnosticOrders = [];

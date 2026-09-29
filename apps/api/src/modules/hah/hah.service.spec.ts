@@ -772,3 +772,45 @@ describe("HaHService nutrition-care workflow", () => {
     expect(notify.enqueue).toHaveBeenCalled();
   });
 });
+
+describe("HaHService palliative-care workflow", () => {
+  it("membuat alert untuk beban gejala berat", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          code: "HAH-001",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      haHPalliativeAssessment: {
+        create: jest.fn().mockImplementation(({ data }) =>
+          Promise.resolve({ id: "palliative-1", ...data }),
+        ),
+      },
+      clinicalAlert: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const notify = { enqueue: jest.fn().mockResolvedValue({}) };
+    await new HaHService(prisma, notify as any).createPalliativeAssessment(
+      "episode-1",
+      {
+        ppsScore: 40,
+        painScore: 8,
+        dyspneaScore: 7,
+        nauseaScore: 3,
+        anxietyScore: 5,
+        consciousnessNotes: "Sadar dan dapat berkomunikasi",
+        goalsOfCare: "Kenyamanan dan tetap bersama keluarga di rumah",
+        preferredPlaceOfCare: "Rumah",
+        escalationPreferences: "Hubungi dokter sebelum rujukan kecuali kegawatdaruratan",
+        comfortPlan: "Optimalkan kontrol nyeri dan sesak sesuai order dokter",
+        nextReviewAt: "2030-01-01T08:00:00Z",
+      },
+      "doctor-1",
+    );
+    expect(prisma.clinicalAlert.create).toHaveBeenCalled();
+    expect(notify.enqueue).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});

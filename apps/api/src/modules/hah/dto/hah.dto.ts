@@ -300,6 +300,23 @@ export class CreateNutritionAssessmentDto {
   @IsDateString() nextReviewAt!: string;
 }
 
+export class CreatePalliativeAssessmentDto {
+  @IsInt() @Min(0) @Max(100) ppsScore!: number;
+  @IsInt() @Min(0) @Max(10) painScore!: number;
+  @IsInt() @Min(0) @Max(10) dyspneaScore!: number;
+  @IsInt() @Min(0) @Max(10) nauseaScore!: number;
+  @IsInt() @Min(0) @Max(10) anxietyScore!: number;
+  @IsString() @MinLength(3) consciousnessNotes!: string;
+  @IsOptional() @IsString() otherSymptoms?: string;
+  @IsString() @MinLength(10) goalsOfCare!: string;
+  @IsString() @MinLength(3) preferredPlaceOfCare!: string;
+  @IsString() @MinLength(10) escalationPreferences!: string;
+  @IsString() @MinLength(10) comfortPlan!: string;
+  @IsOptional() @IsString() familyDiscussionSummary?: string;
+  @IsOptional() @IsString() spiritualPsychosocialNeed?: string;
+  @IsDateString() nextReviewAt!: string;
+}
+
 export class CreateDiagnosticOrderDto {
   @IsString() category!: string;
   @IsString() @MinLength(2) testName!: string;
