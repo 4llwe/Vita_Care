@@ -15,6 +15,7 @@ import {
   HaHEvaluationDisposition,
   HaHEligibilityDecision,
   HaHEpisodeStatus,
+  HaHAllergySeverity,
   HaHTransferStatus,
   HaHVisitStatus,
   MedicationOrderStatus,
@@ -49,6 +50,8 @@ import {
   CreateEquipmentAssignmentDto,
   CreateEpisodeDto,
   CreateMedicationOrderDto,
+  RecordAllergyDto,
+  CreateMedicationReconciliationDto,
   CreateMedicationFulfillmentDto,
   CreatePatientDto,
   CreateVisitDto,
@@ -1387,8 +1390,14 @@ export class HaHService {
     const allergies = Array.isArray(episode.patient.allergies)
       ? episode.patient.allergies.map((x: unknown) => String(x).toLowerCase())
       : [];
+    const structuredAllergies = (episode.patient.allergyRecords ?? [])
+      .filter((allergy: { status: string }) => allergy.status === "ACTIVE")
+      .map((allergy: { substance: string }) =>
+        allergy.substance.trim().toLowerCase(),
+      );
+    const knownAllergies = [...new Set([...allergies, ...structuredAllergies])];
     if (
-      allergies.some(
+      knownAllergies.some(
         (a: string) =>
           dto.medicationName.toLowerCase().includes(a) ||
           a.includes(dto.medicationName.toLowerCase()),
@@ -1453,6 +1462,90 @@ export class HaHService {
       scheduledDoses: scheduleAt.length,
     });
     return order;
+  }
+
+  async recordAllergy(
+    episodeId: string,
+    dto: RecordAllergyDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    const duplicate = await this.prisma.haHAllergy.findFirst({
+      where: {
+        patientId: episode.patientId,
+        substance: { equals: dto.substance.trim(), mode: "insensitive" },
+        status: "ACTIVE",
+      },
+    });
+    if (duplicate)
+      throw new BadRequestException("Alergi aktif terhadap zat ini sudah tercatat");
+    const allergy = await this.prisma.haHAllergy.create({
+      data: {
+        patientId: episode.patientId,
+        substance: dto.substance.trim(),
+        category: dto.category,
+        reaction: dto.reaction.trim(),
+        severity: dto.severity as HaHAllergySeverity,
+        recordedById: actorId,
+        verifiedById: dto.verified ? actorId : null,
+        verifiedAt: dto.verified ? new Date() : null,
+        note: dto.note?.trim() || null,
+      },
+    });
+    await this.auditEpisodeEvent(actorId, "ALLERGY_RECORDED", episodeId, {
+      allergyId: allergy.id,
+      substance: allergy.substance,
+      severity: allergy.severity,
+      verified: !!allergy.verifiedAt,
+    });
+    return allergy;
+  }
+
+  async createMedicationReconciliation(
+    episodeId: string,
+    dto: CreateMedicationReconciliationDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (
+      !(
+        [
+          HaHEpisodeStatus.ADMITTED,
+          HaHEpisodeStatus.ACTIVE,
+          HaHEpisodeStatus.TRANSFER_REQUESTED,
+          HaHEpisodeStatus.TRANSFERRED,
+        ] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException(
+        "Rekonsiliasi obat memerlukan episode admitted, aktif, atau transfer",
+      );
+    const clean = (values: string[]) =>
+      values.map((value) => value.trim()).filter(Boolean);
+    const reconciliation =
+      await this.prisma.haHMedicationReconciliation.create({
+        data: {
+          episodeId,
+          transitionType: dto.transitionType,
+          informationSources: clean(dto.informationSources),
+          homeMedications: clean(dto.homeMedications),
+          discrepancies: clean(dto.discrepancies),
+          actionsTaken: dto.actionsTaken.trim(),
+          patientOrCaregiverInvolved: dto.patientOrCaregiverInvolved,
+          completedById: actorId,
+        },
+      });
+    await this.auditEpisodeEvent(
+      actorId,
+      "MEDICATION_RECONCILIATION_COMPLETED",
+      episodeId,
+      {
+        reconciliationId: reconciliation.id,
+        transitionType: reconciliation.transitionType,
+        discrepancyCount: clean(dto.discrepancies).length,
+      },
+    );
+    return reconciliation;
   }
 
   async updateMedicationStatus(id: string, dto: UpdateMedicationStatusDto) {
@@ -3250,7 +3343,14 @@ export class HaHService {
       where: { ...access, ...(status ? { status } : {}) },
       orderBy: { createdAt: "desc" },
       include: {
-        patient: true,
+        patient: {
+          include: {
+            allergyRecords: {
+              where: { status: "ACTIVE" },
+              orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
+            },
+          },
+        },
         eligibility: true,
         carePlan: true,
         _count: { select: { alerts: true, observations: true, visits: true } },
@@ -3345,7 +3445,14 @@ export class HaHService {
     const result = await this.prisma.haHEpisode.findFirstOrThrow({
       where: { id, ...access },
       include: {
-        patient: true,
+        patient: {
+          include: {
+            allergyRecords: {
+              where: { status: "ACTIVE" },
+              orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
+            },
+          },
+        },
         eligibility: true,
         carePlan: true,
         carePlanRevisions: { orderBy: { version: "desc" }, take: 10 },
@@ -3412,6 +3519,10 @@ export class HaHService {
         alerts: { orderBy: { createdAt: "desc" } },
         visits: { orderBy: { scheduledStart: "asc" } },
         medicationOrders: { include: { administrations: true } },
+        medicationReconciliations: {
+          orderBy: { completedAt: "desc" },
+          take: 50,
+        },
         transfers: { orderBy: { requestedAt: "desc" } },
         diagnosticOrders: { orderBy: { orderedAt: "desc" } },
         equipmentAssignments: {

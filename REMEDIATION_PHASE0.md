@@ -210,5 +210,11 @@
 - Only clinical team members may request acknowledgement; senders cannot acknowledge their own instructions.
 - Urgent messages create a high-priority clinical alert and team notification instead of remaining an untracked chat message, and send/read/acknowledgement events are audited.
 
+## Phase 2.20 — structured allergy and medication reconciliation safety
+- Preserved the legacy patient allergy list while adding structured substance, category, reaction, severity, verification, and provenance records.
+- Active structured drug allergies participate in medication-order safety checks alongside existing allergy data.
+- Added episode-scoped medication reconciliation for admission, routine review, transfer, and discharge, including information sources, home medicines, discrepancies, resolution actions, and patient/caregiver involvement.
+- Allergy entries and completed reconciliations are displayed in the existing medication workspace and written to the clinical audit trail.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

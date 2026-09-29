@@ -36,6 +36,8 @@ import {
   CreateEquipmentSafetyCheckDto,
   CreateEpisodeDto,
   CreateMedicationOrderDto,
+  RecordAllergyDto,
+  CreateMedicationReconciliationDto,
   CreateMedicationFulfillmentDto,
   CreatePatientDto,
   CreateVisitDto,
@@ -321,6 +323,26 @@ export class HaHController {
     @CurrentUser() u: { id: string },
   ) {
     return this.hah.createMedicationOrder(id, dto, u.id);
+  }
+
+  @Post("episodes/:id/allergies")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  recordAllergy(
+    @Param("id") id: string,
+    @Body() dto: RecordAllergyDto,
+    @CurrentUser() actor: AuthActor,
+  ) {
+    return this.hah.recordAllergy(id, dto, actor.id);
+  }
+
+  @Post("episodes/:id/medication-reconciliations")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  reconcileMedications(
+    @Param("id") id: string,
+    @Body() dto: CreateMedicationReconciliationDto,
+    @CurrentUser() actor: AuthActor,
+  ) {
+    return this.hah.createMedicationReconciliation(id, dto, actor.id);
   }
 
   @Patch("medications/:id/status")

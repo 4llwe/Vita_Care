@@ -131,6 +131,13 @@ enum HaHTransferStatus {
   CANCELLED
 }
 
+enum HaHAllergySeverity {
+  MILD
+  MODERATE
+  SEVERE
+  UNKNOWN
+}
+
 model User {
   id          String   @id @default(cuid())
   email       String   @unique
@@ -873,6 +880,7 @@ model HaHPatient {
   updatedAt           DateTime     @updatedAt
   episodes            HaHEpisode[]
   caregiverAccesses   HaHCaregiverAccess[]
+  allergyRecords      HaHAllergy[]
 }
 
 model HaHEpisode {
@@ -908,6 +916,7 @@ model HaHEpisode {
   alerts                ClinicalAlert[]
   visits                HaHVisit[]
   medicationOrders      MedicationOrder[]
+  medicationReconciliations HaHMedicationReconciliation[]
   transfers             HaHTransfer[]
   diagnosticOrders      HaHDiagnosticOrder[]
   equipmentAssignments  HaHEquipmentAssignment[]
@@ -929,6 +938,41 @@ model HaHEpisode {
 
   @@index([status, createdAt])
   @@index([patientId, createdAt])
+}
+
+model HaHAllergy {
+  id           String             @id @default(cuid())
+  patientId    String
+  patient      HaHPatient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  substance    String
+  category     String             @default("DRUG")
+  reaction     String
+  severity     HaHAllergySeverity @default(UNKNOWN)
+  status       String             @default("ACTIVE")
+  recordedById String
+  verifiedById String?
+  verifiedAt   DateTime?
+  note         String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([patientId, status])
+}
+
+model HaHMedicationReconciliation {
+  id                         String     @id @default(cuid())
+  episodeId                  String
+  episode                    HaHEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  transitionType             String
+  informationSources         Json
+  homeMedications            Json
+  discrepancies              Json
+  actionsTaken               String
+  patientOrCaregiverInvolved Boolean    @default(false)
+  completedById              String
+  completedAt                DateTime   @default(now())
+
+  @@index([episodeId, completedAt])
 }
 
 model HaHPostDischargeFollowUp {
