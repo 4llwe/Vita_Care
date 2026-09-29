@@ -853,6 +853,64 @@ export default function EpisodePage() {
                 </div>
               ))}
             </Panel>
+            <Panel title="Asesmen nutrisi & intervensi gizi">
+              <form
+                className="space-y-3"
+                onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  const optionalNumber = (name: string) =>
+                    f.get(name) === "" ? undefined : Number(f.get(name));
+                  submit(`/hah/episodes/${id}/nutrition-assessments`, {
+                    weightKg: Number(f.get("nutritionWeightKg")),
+                    heightCm: Number(f.get("nutritionHeightCm")),
+                    weightChangePercent: optionalNumber("weightChangePercent"),
+                    intakePercent: Number(f.get("intakePercent")),
+                    appetite: f.get("appetite"),
+                    swallowingDifficulty: f.get("swallowingDifficulty") === "on",
+                    nauseaVomiting: f.get("nauseaVomiting") === "on",
+                    nutritionRisk: f.get("nutritionRisk"),
+                    dietPlan: f.get("nutritionDietPlan"),
+                    proteinTargetG: optionalNumber("proteinTargetG"),
+                    fluidTargetMl: optionalNumber("fluidTargetMl"),
+                    supplements: f.get("supplements") || undefined,
+                    education: f.get("nutritionEducation") || undefined,
+                    nextReviewAt: new Date(
+                      String(f.get("nutritionReviewAt")),
+                    ).toISOString(),
+                  });
+                }}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Berat badan (kg)"><input name="nutritionWeightKg" type="number" min="1" step="0.1" required className={input} /></Field>
+                  <Field label="Tinggi badan (cm)"><input name="nutritionHeightCm" type="number" min="30" step="0.1" required className={input} /></Field>
+                  <Field label="Perubahan berat (%)"><input name="weightChangePercent" type="number" step="0.1" className={input} /></Field>
+                  <Field label="Asupan makanan (%)"><input name="intakePercent" type="number" min="0" max="100" required className={input} /></Field>
+                  <Field label="Nafsu makan"><input name="appetite" required className={input} /></Field>
+                  <Field label="Risiko nutrisi">
+                    <select name="nutritionRisk" className={input}><option value="LOW">Rendah</option><option value="MODERATE">Sedang</option><option value="HIGH">Tinggi</option></select>
+                  </Field>
+                </div>
+                <label className="flex gap-2 font-semibold text-orange-800"><input name="swallowingDifficulty" type="checkbox" /> Kesulitan menelan</label>
+                <label className="flex gap-2"><input name="nauseaVomiting" type="checkbox" /> Mual atau muntah</label>
+                <Field label="Rencana diet"><textarea name="nutritionDietPlan" required className={input} /></Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Target protein (g/hari)"><input name="proteinTargetG" type="number" min="0" step="0.1" className={input} /></Field>
+                  <Field label="Target cairan (ml/hari)"><input name="fluidTargetMl" type="number" min="0" className={input} /></Field>
+                </div>
+                <Field label="Suplemen"><input name="supplements" className={input} /></Field>
+                <Field label="Edukasi gizi"><textarea name="nutritionEducation" className={input} /></Field>
+                <Field label="Review berikutnya"><input name="nutritionReviewAt" type="datetime-local" required className={input} /></Field>
+                <button className={btn} disabled={busy}>Simpan asesmen nutrisi</button>
+              </form>
+              {d.nutritionAssessments?.map((n: any) => (
+                <div key={n.id} className={`rounded-xl border p-3 text-sm ${n.nutritionRisk === "HIGH" || n.intakePercent < 50 ? "border-orange-300 bg-orange-50" : "bg-slate-50"}`}>
+                  <strong>Risiko {n.nutritionRisk}</strong> · BMI {n.bmi} · Asupan {n.intakePercent}%
+                  <p className="mt-1"><b>Rencana:</b> {n.dietPlan}</p>
+                  <p className="mt-1 text-xs text-slate-500">Review {new Date(n.nextReviewAt).toLocaleString("id-ID")}</p>
+                </div>
+              ))}
+            </Panel>
             <Panel title="Fungsi, risiko jatuh & rehabilitasi">
               <form
                 className="space-y-3"

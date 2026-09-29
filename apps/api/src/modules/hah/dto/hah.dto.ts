@@ -283,6 +283,23 @@ export class CreateFunctionalAssessmentDto {
   @IsDateString() nextReviewAt!: string;
 }
 
+export class CreateNutritionAssessmentDto {
+  @IsNumber() @Min(1) @Max(500) weightKg!: number;
+  @IsNumber() @Min(30) @Max(250) heightCm!: number;
+  @IsOptional() @IsNumber() @Min(-100) @Max(100) weightChangePercent?: number;
+  @IsInt() @Min(0) @Max(100) intakePercent!: number;
+  @IsString() @MinLength(2) appetite!: string;
+  @IsBoolean() swallowingDifficulty!: boolean;
+  @IsBoolean() nauseaVomiting!: boolean;
+  @IsIn(["LOW", "MODERATE", "HIGH"]) nutritionRisk!: string;
+  @IsString() @MinLength(5) dietPlan!: string;
+  @IsOptional() @IsNumber() @Min(0) proteinTargetG?: number;
+  @IsOptional() @IsInt() @Min(0) fluidTargetMl?: number;
+  @IsOptional() @IsString() supplements?: string;
+  @IsOptional() @IsString() education?: string;
+  @IsDateString() nextReviewAt!: string;
+}
+
 export class CreateDiagnosticOrderDto {
   @IsString() category!: string;
   @IsString() @MinLength(2) testName!: string;

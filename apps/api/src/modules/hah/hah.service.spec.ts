@@ -7,6 +7,7 @@ import {
   PharmacyFulfillmentStatus,
   WoundProgress,
   FallRiskLevel,
+  NutritionRiskLevel,
 } from "@prisma/client";
 import { HaHService } from "./hah.service";
 
@@ -725,5 +726,49 @@ describe("HaHService functional rehabilitation workflow", () => {
     expect(prisma.clinicalAlert.create).toHaveBeenCalled();
     expect(notify.enqueue).toHaveBeenCalled();
     expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});
+
+describe("HaHService nutrition-care workflow", () => {
+  it("menghitung BMI dan membuat alert untuk risiko nutrisi tinggi", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          code: "HAH-001",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      haHNutritionAssessment: {
+        create: jest.fn().mockImplementation(({ data }) =>
+          Promise.resolve({ id: "nutrition-1", ...data }),
+        ),
+      },
+      clinicalAlert: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const notify = { enqueue: jest.fn().mockResolvedValue({}) };
+    const result = await new HaHService(
+      prisma,
+      notify as any,
+    ).createNutritionAssessment(
+      "episode-1",
+      {
+        weightKg: 45,
+        heightCm: 170,
+        intakePercent: 35,
+        appetite: "Menurun",
+        swallowingDifficulty: true,
+        nauseaVomiting: false,
+        nutritionRisk: "HIGH",
+        dietPlan: "Diet tinggi energi protein bertahap",
+        nextReviewAt: "2030-01-01T08:00:00Z",
+      },
+      "dietitian-1",
+    );
+    expect(result.bmi).toBe(15.6);
+    expect(result.nutritionRisk).toBe(NutritionRiskLevel.HIGH);
+    expect(prisma.clinicalAlert.create).toHaveBeenCalled();
+    expect(notify.enqueue).toHaveBeenCalled();
   });
 });

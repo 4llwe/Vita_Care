@@ -782,6 +782,12 @@ enum FunctionalProgress {
   GOAL_ACHIEVED
 }
 
+enum NutritionRiskLevel {
+  LOW
+  MODERATE
+  HIGH
+}
+
 enum ClinicalTaskCategory {
   ASSESSMENT
   VITALS
@@ -869,12 +875,40 @@ model HaHEpisode {
   clinicalTasks          HaHClinicalTask[]
   woundAssessments       HaHWoundAssessment[]
   functionalAssessments  HaHFunctionalAssessment[]
+  nutritionAssessments   HaHNutritionAssessment[]
   messages               HaHClinicalMessage[]
   breakGlassAccesses     HaHBreakGlassAccess[]
   careAssignments       CareAssignment[]
 
   @@index([status, createdAt])
   @@index([patientId, createdAt])
+}
+
+model HaHNutritionAssessment {
+  id                    String             @id @default(cuid())
+  episodeId             String
+  episode               HaHEpisode         @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  weightKg              Float
+  heightCm              Float
+  bmi                   Float
+  weightChangePercent   Float?
+  intakePercent         Int
+  appetite              String
+  swallowingDifficulty Boolean            @default(false)
+  nauseaVomiting        Boolean            @default(false)
+  nutritionRisk         NutritionRiskLevel
+  dietPlan              String
+  proteinTargetG        Float?
+  fluidTargetMl         Int?
+  supplements           String?
+  education             String?
+  nextReviewAt          DateTime
+  assessedById          String
+  assessedAt            DateTime           @default(now())
+  createdAt             DateTime           @default(now())
+
+  @@index([episodeId, assessedAt])
+  @@index([nutritionRisk, nextReviewAt])
 }
 
 model HaHFunctionalAssessment {

@@ -21,6 +21,7 @@ import {
   WoundProgress,
   FallRiskLevel,
   FunctionalProgress,
+  NutritionRiskLevel,
 } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/actor";
@@ -47,6 +48,7 @@ import {
   CreateVisitDto,
   CreateWoundAssessmentDto,
   CreateFunctionalAssessmentDto,
+  CreateNutritionAssessmentDto,
   DiagnosticResultDto,
   DischargeDto,
   EndCareAssignmentDto,
@@ -1651,6 +1653,80 @@ export class HaHService {
     return assignment;
   }
 
+  listNutritionAssessments(episodeId: string) {
+    return this.prisma.haHNutritionAssessment.findMany({
+      where: { episodeId },
+      orderBy: { assessedAt: "desc" },
+      take: 200,
+    });
+  }
+
+  async createNutritionAssessment(
+    episodeId: string,
+    dto: CreateNutritionAssessmentDto,
+    actorId: string,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    if (
+      !(
+        [HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]
+      ).includes(episode.status)
+    )
+      throw new BadRequestException("Asesmen nutrisi memerlukan episode aktif");
+    const nextReviewAt = new Date(dto.nextReviewAt);
+    if (nextReviewAt <= new Date())
+      throw new BadRequestException("Review nutrisi harus di masa depan");
+    const heightM = dto.heightCm / 100;
+    const bmi = Math.round((dto.weightKg / (heightM * heightM)) * 10) / 10;
+    const assessment = await this.prisma.haHNutritionAssessment.create({
+      data: {
+        episodeId,
+        weightKg: dto.weightKg,
+        heightCm: dto.heightCm,
+        bmi,
+        weightChangePercent: dto.weightChangePercent,
+        intakePercent: dto.intakePercent,
+        appetite: dto.appetite.trim(),
+        swallowingDifficulty: dto.swallowingDifficulty,
+        nauseaVomiting: dto.nauseaVomiting,
+        nutritionRisk: dto.nutritionRisk as NutritionRiskLevel,
+        dietPlan: dto.dietPlan.trim(),
+        proteinTargetG: dto.proteinTargetG,
+        fluidTargetMl: dto.fluidTargetMl,
+        supplements: dto.supplements?.trim() || null,
+        education: dto.education?.trim() || null,
+        nextReviewAt,
+        assessedById: actorId,
+      },
+    });
+    if (
+      dto.nutritionRisk === NutritionRiskLevel.HIGH ||
+      dto.intakePercent < 50 ||
+      dto.swallowingDifficulty
+    ) {
+      await this.prisma.clinicalAlert.create({
+        data: {
+          episodeId,
+          severity: ClinicalAlertSeverity.HIGH,
+          trigger: `Risiko nutrisi: ${dto.nutritionRisk}`,
+          responseDueAt: new Date(Date.now() + 8 * 60 * 60_000),
+        },
+      });
+      await this.notify.enqueue({
+        channel: "in-app",
+        title: "Risiko nutrisi memerlukan review",
+        body: `${episode.code}: asupan ${dto.intakePercent}% dan risiko ${dto.nutritionRisk}`,
+      });
+    }
+    await this.auditEpisodeEvent(actorId, "NUTRITION_ASSESSMENT_RECORDED", episodeId, {
+      nutritionAssessmentId: assessment.id,
+      nutritionRisk: assessment.nutritionRisk,
+      bmi: assessment.bmi,
+      intakePercent: assessment.intakePercent,
+    });
+    return assessment;
+  }
+
   listFunctionalAssessments(episodeId: string) {
     return this.prisma.haHFunctionalAssessment.findMany({
       where: { episodeId },
@@ -2456,6 +2532,7 @@ export class HaHService {
         },
         woundAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         functionalAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
+        nutritionAssessments: { orderBy: { assessedAt: "desc" }, take: 200 },
         messages: {
           orderBy: { createdAt: "asc" },
           take: 200,
@@ -2513,6 +2590,7 @@ export class HaHService {
       visible.clinicalTasks = [];
       visible.woundAssessments = [];
       visible.functionalAssessments = [];
+      visible.nutritionAssessments = [];
     }
     if (!scope.includes("MEDICATIONS")) visible.medicationOrders = [];
     if (!scope.includes("DIAGNOSTICS")) visible.diagnosticOrders = [];

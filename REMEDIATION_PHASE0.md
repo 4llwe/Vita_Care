@@ -150,5 +150,11 @@
 - High fall risk, a recent fall, or declining function creates a high-priority clinical alert for team review without generating an automatic diagnosis.
 - Functional documentation follows existing episode access, caregiver care-plan consent, and clinical audit trails.
 
+## Phase 2.10 — nutrition assessment and intervention
+- Added longitudinal nutrition assessments with weight, height, calculated BMI, weight change, oral intake, appetite, swallowing difficulty, and nausea/vomiting.
+- Nutrition risk, diet plan, protein/fluid targets, supplements, education, and review dates remain attached to the active episode.
+- High nutrition risk, intake below 50%, or swallowing difficulty creates a high-priority clinical alert for multidisciplinary review without generating an automatic diagnosis.
+- Nutrition records follow existing episode access, caregiver care-plan consent, and clinical audit trails.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.
