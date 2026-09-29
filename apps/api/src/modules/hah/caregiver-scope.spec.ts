@@ -11,6 +11,7 @@ describe("caregiver scopes", () => {
     expect(requiredCaregiverScope("hah/episodes/:id/messages")).toBe(
       "MESSAGES",
     );
+    expect(requiredCaregiverScope("hah/episodes/:id/tasks")).toBe("CARE_PLAN");
     expect(requiredCaregiverScope("hah/episodes/:id")).toBe("SUMMARY");
     expect(requiredCaregiverScope("hah/episodes/:id/emergency-events")).toBe(
       null,

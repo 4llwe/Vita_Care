@@ -117,5 +117,13 @@
 - A primary clinician cannot be removed without assigning a replacement, preserving clinical accountability.
 - The episode workspace shows active and historical team assignments and allows authorized coordinators to end non-primary assignments with a reason.
 
+## Phase 2.5 — clinical task board and structured handover
+- Added episode-scoped clinical tasks for assessment, vital signs, medication, wound care, education, follow-up, and other approved activities.
+- Tasks include an assigned active care-team member, clinical priority, due time, description, and controlled lifecycle.
+- Only the assigned worker or an authorized doctor/coordinator may change a task; invalid state transitions are rejected by the API.
+- Completion or omission requires both an outcome note and a handover note, preserving continuity between visits and shifts.
+- Added a responsive personal task board with overdue and STAT/urgent visual indicators.
+- Task creation, status changes, outcomes, and handovers remain attached to the episode and are written to the audit trail.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

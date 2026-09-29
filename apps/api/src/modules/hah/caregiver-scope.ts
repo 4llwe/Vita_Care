@@ -26,6 +26,8 @@ export function requiredCaregiverScope(
     return "VITALS";
   if (
     path.includes("care-plan") ||
+    path.includes("tasks") ||
+    path.includes("clinical-tasks") ||
     path.includes("evaluations") ||
     path.includes("equipment") ||
     path.includes("transfers") ||

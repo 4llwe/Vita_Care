@@ -276,7 +276,7 @@ export function RoleDashboard({
         </section>
         <QuickLinks
           links={persona === "nurse" ? [
-            { href: "/hah", label: "Pasien Tugas", icon: "P" },
+            { href: "/tasks", label: "Papan Tugas", icon: "T" },
             { href: "/monitoring", label: "Catat Tanda Vital", icon: "V" },
             { href: "/workspace/pemberian-obat", label: "Pemberian Obat", icon: "O" },
             { href: "/hah?focus=alerts", label: "Eskalasi Klinis", icon: "!" },

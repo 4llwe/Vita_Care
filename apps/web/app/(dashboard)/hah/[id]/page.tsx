@@ -53,6 +53,17 @@ export default function EpisodePage() {
     [session.role, ...(session.roles ?? [])].some((role) =>
       ["COORDINATOR", "SUPER_ADMIN"].includes(role),
     );
+  const canCreateTask =
+    session &&
+    [session.role, ...(session.roles ?? [])].some((role) =>
+      [
+        "HEALTH_WORKER",
+        "DOCTOR",
+        "NURSE",
+        "COORDINATOR",
+        "SUPER_ADMIN",
+      ].includes(role),
+    );
   useEffect(() => {
     fetchMe().then(setSession).catch(() => undefined);
   }, []);
@@ -241,6 +252,124 @@ export default function EpisodePage() {
             ) : (
               <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
                 Tim perawatan belum ditetapkan.
+              </p>
+            )}
+          </div>
+        </Panel>
+        <Panel title="Tugas klinis">
+          {canCreateTask && ["ADMITTED", "ACTIVE"].includes(d.status) ? (
+            <form
+              className="space-y-3 rounded-xl border bg-slate-50 p-4"
+              onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                event.preventDefault();
+                const form = new FormData(event.currentTarget);
+                submit(`/hah/episodes/${id}/tasks`, {
+                  title: form.get("title"),
+                  description: form.get("description") || undefined,
+                  category: form.get("category"),
+                  priority: form.get("priority"),
+                  assignedToHealthWorkerId: form.get(
+                    "assignedToHealthWorkerId",
+                  ),
+                  dueAt: new Date(String(form.get("dueAt"))).toISOString(),
+                });
+              }}
+            >
+              <Field label="Judul tugas">
+                <input name="title" required minLength={3} className={input} />
+              </Field>
+              <Field label="Deskripsi">
+                <textarea name="description" className={input} />
+              </Field>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Kategori">
+                  <select name="category" className={input}>
+                    <option value="ASSESSMENT">Asesmen</option>
+                    <option value="VITALS">Tanda vital</option>
+                    <option value="MEDICATION">Obat</option>
+                    <option value="WOUND_CARE">Perawatan luka</option>
+                    <option value="EDUCATION">Edukasi</option>
+                    <option value="FOLLOW_UP">Tindak lanjut</option>
+                    <option value="OTHER">Lainnya</option>
+                  </select>
+                </Field>
+                <Field label="Prioritas">
+                  <select name="priority" className={input}>
+                    <option value="ROUTINE">Rutin</option>
+                    <option value="URGENT">Mendesak</option>
+                    <option value="STAT">Segera / STAT</option>
+                  </select>
+                </Field>
+                <Field label="Petugas">
+                  <select
+                    name="assignedToHealthWorkerId"
+                    required
+                    className={input}
+                  >
+                    <option value="">Pilih anggota tim</option>
+                    {(d.careAssignments ?? [])
+                      .filter((assignment: any) => assignment.isActive)
+                      .map((assignment: any) => (
+                        <option
+                          key={assignment.id}
+                          value={assignment.healthWorkerId}
+                        >
+                          {assignment.healthWorker.name} ·{" "}
+                          {assignment.healthWorker.profession}
+                        </option>
+                      ))}
+                  </select>
+                </Field>
+                <Field label="Batas waktu">
+                  <input
+                    name="dueAt"
+                    type="datetime-local"
+                    required
+                    className={input}
+                  />
+                </Field>
+              </div>
+              <button className={btn} disabled={busy}>
+                Buat tugas
+              </button>
+            </form>
+          ) : null}
+          <div className="space-y-2">
+            {d.clinicalTasks?.length ? (
+              d.clinicalTasks.map((task: any) => (
+                <article
+                  key={task.id}
+                  className={`rounded-xl border p-3 text-sm ${
+                    task.priority === "STAT"
+                      ? "border-red-300 bg-red-50"
+                      : task.priority === "URGENT"
+                        ? "border-orange-300 bg-orange-50"
+                        : "bg-slate-50"
+                  }`}
+                >
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <div>
+                      <strong>{task.title}</strong>
+                      <p className="text-slate-600">
+                        {task.assignedToHealthWorker.name} ·{" "}
+                        {task.category.replaceAll("_", " ")}
+                      </p>
+                    </div>
+                    <b>{task.status.replaceAll("_", " ")}</b>
+                  </div>
+                  <p className="mt-2">
+                    Batas: {new Date(task.dueAt).toLocaleString("id-ID")}
+                  </p>
+                  {task.handoverNote ? (
+                    <p className="mt-2 rounded-lg bg-white p-2">
+                      <b>Handover:</b> {task.handoverNote}
+                    </p>
+                  ) : null}
+                </article>
+              ))
+            ) : (
+              <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
+                Belum ada tugas klinis.
               </p>
             )}
           </div>

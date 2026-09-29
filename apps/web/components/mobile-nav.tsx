@@ -8,7 +8,7 @@ import { EmergencyButton } from "./emergency-button";
 const menu: Record<ClinicalPersona, readonly (readonly [string, string])[]> = {
   admin: [["/dashboard", "Beranda"], ["/hah", "Pasien"], ["/bookings", "Jadwal"], ["/master", "Kelola"]],
   doctor: [["/dashboard", "Beranda"], ["/hah", "Pasien"], ["/monitoring", "Monitor"], ["/bookings", "Jadwal"]],
-  nurse: [["/dashboard", "Beranda"], ["/hah", "Tugas"], ["/monitoring", "Vital"], ["/bookings", "Jadwal"]],
+  nurse: [["/dashboard", "Beranda"], ["/tasks", "Tugas"], ["/monitoring", "Vital"], ["/bookings", "Jadwal"]],
   finance: [["/dashboard", "Beranda"], ["/invoices", "Tagihan"], ["/master", "Tarif"], ["/reports", "Laporan"]],
   patient: [["/dashboard", "Beranda"], ["/portal", "Layanan"], ["/monitoring", "Kondisi"], ["/bookings", "Jadwal"]],
   caregiver: [["/dashboard", "Beranda"], ["/workspace/keluarga", "Pasien"], ["/monitoring", "Kondisi"], ["/bookings", "Jadwal"]],

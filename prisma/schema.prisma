@@ -252,6 +252,7 @@ model HealthWorker {
   bookings         Booking[]
   hahVisits         HaHVisit[]
   careAssignments  CareAssignment[]
+  clinicalTasks    HaHClinicalTask[]
 }
 
 model Booking {
@@ -729,6 +730,30 @@ enum HaHEvaluationDisposition {
   TRANSFER_RECOMMENDED
 }
 
+enum ClinicalTaskStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  OMITTED
+  CANCELLED
+}
+
+enum ClinicalTaskPriority {
+  ROUTINE
+  URGENT
+  STAT
+}
+
+enum ClinicalTaskCategory {
+  ASSESSMENT
+  VITALS
+  MEDICATION
+  WOUND_CARE
+  EDUCATION
+  FOLLOW_UP
+  OTHER
+}
+
 enum EmergencyAction {
   MEDICAL_TEAM
   HOSPITAL
@@ -803,6 +828,7 @@ model HaHEpisode {
   carePlanRevisions      HaHCarePlanRevision[]
   clinicalEvaluations    HaHClinicalEvaluation[]
   emergencyEvents        HaHEmergencyEvent[]
+  clinicalTasks          HaHClinicalTask[]
   messages               HaHClinicalMessage[]
   breakGlassAccesses     HaHBreakGlassAccess[]
   careAssignments       CareAssignment[]
@@ -884,6 +910,31 @@ model HaHClinicalEvaluation {
 
   @@index([episodeId, evaluatedAt])
   @@index([disposition, evaluatedAt])
+}
+
+model HaHClinicalTask {
+  id                       String               @id @default(cuid())
+  episodeId                String
+  episode                  HaHEpisode           @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  assignedToHealthWorkerId String
+  assignedToHealthWorker   HealthWorker         @relation(fields: [assignedToHealthWorkerId], references: [id])
+  title                    String
+  description              String?
+  category                 ClinicalTaskCategory
+  priority                 ClinicalTaskPriority @default(ROUTINE)
+  status                   ClinicalTaskStatus   @default(PLANNED)
+  dueAt                    DateTime
+  startedAt                DateTime?
+  completedAt              DateTime?
+  outcomeNote              String?
+  handoverNote             String?
+  createdById              String
+  completedById            String?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+
+  @@index([assignedToHealthWorkerId, status, dueAt])
+  @@index([episodeId, status, dueAt])
 }
 
 model HaHEmergencyEvent {

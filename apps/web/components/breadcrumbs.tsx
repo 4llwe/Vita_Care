@@ -13,6 +13,7 @@ const label: Record<string, string> = {
   notifications: "Notifikasi Klinis",
   "clinical-protocol": "Protokol EWS",
   "service-requests": "Permintaan Layanan",
+  tasks: "Tugas Klinis",
   users: "Manajemen Pengguna",
   reports: "Pusat Laporan",
   settings: "Status Konfigurasi",
