@@ -5,7 +5,7 @@ import { api } from "../../lib/api";
 import { getToken } from "../../lib/auth";
 import { uploadFile } from "../../lib/upload";
 import { Modal, PrimaryButton } from "../modal";
-import { Field, TextInput, FormError } from "../form-controls";
+import { Field, FormError } from "../form-controls";
 
 type Capa = {
   id: string;

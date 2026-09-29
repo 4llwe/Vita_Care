@@ -14,7 +14,8 @@
     "seed": "TS_NODE_PROJECT=tsconfig.scripts.json node -r ts-node/register/transpile-only prisma/seed.ts",
     "preflight:prod": "sh scripts/preflight-production.sh",
     "verify:menus": "node scripts/verify-menu-operations.mjs",
-    "verify:prod": "pnpm preflight:prod && pnpm verify:menus && pnpm lint && pnpm test && pnpm build",
+    "verify:acceptance": "node scripts/verify-clinical-acceptance.mjs",
+    "verify:prod": "pnpm preflight:prod && pnpm verify:menus && pnpm verify:acceptance && pnpm lint && pnpm test && pnpm build",
     "backfill:booking-patient": "TS_NODE_PROJECT=tsconfig.scripts.json node -r ts-node/register/transpile-only scripts/backfill-booking-patient.ts"
   },
   "devDependencies": {
