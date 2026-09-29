@@ -10,8 +10,8 @@ const menu: Record<ClinicalPersona, readonly (readonly [string, string])[]> = {
   doctor: [["/dashboard", "Beranda"], ["/hah", "Pasien"], ["/monitoring", "Monitor"], ["/diagnostics", "Lab"]],
   nurse: [["/dashboard", "Beranda"], ["/tasks", "Tugas"], ["/monitoring", "Vital"], ["/diagnostics", "Lab"]],
   finance: [["/dashboard", "Beranda"], ["/invoices", "Tagihan"], ["/master", "Tarif"], ["/reports", "Laporan"]],
-  patient: [["/dashboard", "Beranda"], ["/portal", "Layanan"], ["/monitoring", "Kondisi"], ["/bookings", "Jadwal"]],
-  caregiver: [["/dashboard", "Beranda"], ["/workspace/keluarga", "Pasien"], ["/monitoring", "Kondisi"], ["/bookings", "Jadwal"]],
+  patient: [["/dashboard", "Beranda"], ["/portal", "Layanan"], ["/monitoring", "Kondisi"], ["/pharmacy", "Obat"]],
+  caregiver: [["/dashboard", "Beranda"], ["/workspace/keluarga", "Pasien"], ["/monitoring", "Kondisi"], ["/pharmacy", "Obat"]],
   governance: [["/dashboard", "Beranda"], ["/findings", "Temuan"], ["/risks", "Risiko"], ["/documents", "Dokumen"]],
 };
 

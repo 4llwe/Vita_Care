@@ -15,6 +15,7 @@ const label: Record<string, string> = {
   "service-requests": "Permintaan Layanan",
   tasks: "Tugas Klinis",
   diagnostics: "Laboratorium & Diagnostik",
+  pharmacy: "Farmasi & Pengantaran Obat",
   users: "Manajemen Pengguna",
   reports: "Pusat Laporan",
   settings: "Status Konfigurasi",

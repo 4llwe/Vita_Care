@@ -35,6 +35,7 @@ import {
   CreateEquipmentAssignmentDto,
   CreateEpisodeDto,
   CreateMedicationOrderDto,
+  CreateMedicationFulfillmentDto,
   CreatePatientDto,
   CreateVisitDto,
   DiagnosticResultDto,
@@ -50,6 +51,7 @@ import {
   UpdateDiagnosticStatusDto,
   UpdateClinicalTaskDto,
   UpdateMedicationStatusDto,
+  UpdateMedicationFulfillmentDto,
   UpdateVisitStatusDto,
 } from "./dto/hah.dto";
 import { HaHService } from "./hah.service";
@@ -275,6 +277,48 @@ export class HaHController {
   )
   medicationAdherence(@Param("id") id: string) {
     return this.hah.medicationAdherence(id);
+  }
+
+  @Post("medications/:id/fulfillments")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  requestMedicationFulfillment(
+    @Param("id") id: string,
+    @Body() dto: CreateMedicationFulfillmentDto,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.requestMedicationFulfillment(id, dto, u.id);
+  }
+
+  @Get("pharmacy/fulfillments")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  medicationFulfillments(@CurrentUser() actor: AuthActor) {
+    return this.hah.listMedicationFulfillments(actor);
+  }
+
+  @Patch("pharmacy-fulfillments/:id")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  updateMedicationFulfillment(
+    @Param("id") id: string,
+    @Body() dto: UpdateMedicationFulfillmentDto,
+    @CurrentUser() actor: AuthActor,
+  ) {
+    return this.hah.updateMedicationFulfillment(id, dto, actor);
   }
 
   @Post("episodes/:id/visits")

@@ -807,6 +807,26 @@ export default function EpisodePage() {
                     </div>
                   ) : null}
                   <div className="mt-2 flex gap-2">
+                    {m.status === "ACTIVE" && (
+                      <button
+                        onClick={() => {
+                          const quantity = window.prompt(
+                            "Jumlah obat yang diminta",
+                          );
+                          const deliveryAddress = window.prompt(
+                            "Alamat lengkap pengantaran",
+                          );
+                          if (quantity && deliveryAddress)
+                            submit(
+                              `/hah/medications/${m.id}/fulfillments`,
+                              { quantity, deliveryAddress },
+                            );
+                        }}
+                        className="rounded border border-emerald-500 bg-white px-3 py-2 font-semibold text-emerald-800"
+                      >
+                        Minta refill
+                      </button>
+                    )}
                     <button
                       onClick={() =>
                         submit(`/hah/medications/${m.id}/administrations`, {

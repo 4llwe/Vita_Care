@@ -17,6 +17,7 @@ import {
   HaHEpisodeStatus,
   HaHVisitStatus,
   MedicationOrderStatus,
+  PharmacyFulfillmentStatus,
 } from "@prisma/client";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/actor";
@@ -38,6 +39,7 @@ import {
   CreateEquipmentAssignmentDto,
   CreateEpisodeDto,
   CreateMedicationOrderDto,
+  CreateMedicationFulfillmentDto,
   CreatePatientDto,
   CreateVisitDto,
   DiagnosticResultDto,
@@ -51,6 +53,7 @@ import {
   UpdateDiagnosticStatusDto,
   UpdateClinicalTaskDto,
   UpdateMedicationStatusDto,
+  UpdateMedicationFulfillmentDto,
   UpdateVisitStatusDto,
 } from "./dto/hah.dto";
 import {
@@ -1171,6 +1174,218 @@ export class HaHService {
       adherencePercent: due ? Math.round((given / due) * 100) : null,
       administrations,
     };
+  }
+
+  async requestMedicationFulfillment(
+    medicationOrderId: string,
+    dto: CreateMedicationFulfillmentDto,
+    actorId: string,
+  ) {
+    const order = await this.prisma.medicationOrder.findUnique({
+      where: { id: medicationOrderId },
+      include: { fulfillments: { orderBy: { refillNumber: "desc" }, take: 1 } },
+    });
+    if (!order) throw new NotFoundException("Medication order tidak ditemukan");
+    if (order.status !== MedicationOrderStatus.ACTIVE)
+      throw new BadRequestException("Pengisian ulang memerlukan order obat aktif");
+    const open = await this.prisma.medicationFulfillment.findFirst({
+      where: {
+        medicationOrderId,
+        status: {
+          notIn: [
+            PharmacyFulfillmentStatus.DELIVERED,
+            PharmacyFulfillmentStatus.CANCELLED,
+          ],
+        },
+      },
+    });
+    if (open)
+      throw new BadRequestException("Permintaan pengisian obat masih berjalan");
+    const fulfillment = await this.prisma.medicationFulfillment.create({
+      data: {
+        medicationOrderId,
+        quantity: dto.quantity.trim(),
+        deliveryAddress: dto.deliveryAddress.trim(),
+        requestNote: dto.requestNote?.trim() || null,
+        requestedById: actorId,
+        refillNumber: (order.fulfillments[0]?.refillNumber ?? 0) + 1,
+      },
+      include: {
+        medicationOrder: { include: { episode: { include: { patient: true } } } },
+      },
+    });
+    await this.auditEpisodeEvent(actorId, "MEDICATION_REFILL_REQUESTED", order.episodeId, {
+      medicationOrderId,
+      fulfillmentId: fulfillment.id,
+      refillNumber: fulfillment.refillNumber,
+    });
+    return fulfillment;
+  }
+
+  async listMedicationFulfillments(actor: AuthActor) {
+    const elevated = actorHasAnyRole(actor, ["SUPER_ADMIN", "COORDINATOR"]);
+    const caregiverOnly =
+      actorHasAnyRole(actor, ["CAREGIVER"]) &&
+      !actorHasAnyRole(actor, ["PATIENT", ...CLINICAL_ROLES]);
+    const rows = await this.prisma.medicationFulfillment.findMany({
+      where: elevated
+        ? {}
+        : {
+            medicationOrder: {
+              episode: {
+                OR: [
+                  { attendingPhysicianId: actor.id },
+                  { patient: { portalUserId: actor.id } },
+                  {
+                    patient: {
+                      caregiverAccesses: {
+                        some: {
+                          caregiverId: actor.id,
+                          revokedAt: null,
+                          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+                        },
+                      },
+                    },
+                  },
+                  {
+                    careAssignments: {
+                      some: {
+                        isActive: true,
+                        healthWorker: { userId: actor.id },
+                        OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }],
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+      include: {
+        medicationOrder: {
+          include: {
+            episode: {
+              include: {
+                patient: {
+                  include: {
+                    caregiverAccesses: {
+                      where: {
+                        caregiverId: actor.id,
+                        revokedAt: null,
+                        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+                      },
+                      select: { scope: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ status: "asc" }, { requestedAt: "desc" }],
+      take: 250,
+    });
+    if (!caregiverOnly) return rows;
+    return rows.filter((row) =>
+      row.medicationOrder.episode.patient.caregiverAccesses.some((grant) =>
+        caregiverScopeList(grant.scope).includes("MEDICATIONS"),
+      ),
+    );
+  }
+
+  async updateMedicationFulfillment(
+    id: string,
+    dto: UpdateMedicationFulfillmentDto,
+    actor: AuthActor,
+  ) {
+    const current = await this.prisma.medicationFulfillment.findUnique({
+      where: { id },
+      include: { medicationOrder: true },
+    });
+    if (!current) throw new NotFoundException("Permintaan farmasi tidak ditemukan");
+    const next = dto.status as PharmacyFulfillmentStatus;
+    const transitions: Partial<
+      Record<PharmacyFulfillmentStatus, PharmacyFulfillmentStatus[]>
+    > = {
+      [PharmacyFulfillmentStatus.REQUESTED]: [
+        PharmacyFulfillmentStatus.CLINICAL_REVIEW,
+        PharmacyFulfillmentStatus.CANCELLED,
+      ],
+      [PharmacyFulfillmentStatus.CLINICAL_REVIEW]: [
+        PharmacyFulfillmentStatus.APPROVED,
+        PharmacyFulfillmentStatus.CANCELLED,
+      ],
+      [PharmacyFulfillmentStatus.APPROVED]: [
+        PharmacyFulfillmentStatus.PREPARING,
+        PharmacyFulfillmentStatus.CANCELLED,
+      ],
+      [PharmacyFulfillmentStatus.PREPARING]: [
+        PharmacyFulfillmentStatus.OUT_FOR_DELIVERY,
+        PharmacyFulfillmentStatus.CANCELLED,
+      ],
+      [PharmacyFulfillmentStatus.OUT_FOR_DELIVERY]: [
+        PharmacyFulfillmentStatus.DELIVERED,
+      ],
+    };
+    if (!(transitions[current.status] ?? []).includes(next))
+      throw new BadRequestException(
+        `Transisi farmasi ${current.status} → ${next} tidak diizinkan`,
+      );
+    if (
+      next === PharmacyFulfillmentStatus.APPROVED &&
+      !actorHasAnyRole(actor, ["DOCTOR", "SUPER_ADMIN"])
+    )
+      throw new ForbiddenException("Persetujuan refill memerlukan kewenangan dokter");
+    if (
+      next === PharmacyFulfillmentStatus.OUT_FOR_DELIVERY &&
+      !dto.courierName?.trim()
+    )
+      throw new BadRequestException("Nama kurir wajib dicatat");
+    if (
+      next === PharmacyFulfillmentStatus.CANCELLED &&
+      !dto.cancellationReason?.trim()
+    )
+      throw new BadRequestException("Alasan pembatalan wajib dicatat");
+    const now = new Date();
+    const data: Prisma.MedicationFulfillmentUpdateInput = {
+      status: next,
+      trackingNote: dto.trackingNote?.trim() || undefined,
+      ...(next === PharmacyFulfillmentStatus.CLINICAL_REVIEW
+        ? { reviewedById: actor.id, reviewedAt: now }
+        : {}),
+      ...(next === PharmacyFulfillmentStatus.APPROVED
+        ? { approvedById: actor.id, approvedAt: now }
+        : {}),
+      ...(next === PharmacyFulfillmentStatus.PREPARING
+        ? { preparedById: actor.id, preparedAt: now }
+        : {}),
+      ...(next === PharmacyFulfillmentStatus.OUT_FOR_DELIVERY
+        ? {
+            courierName: dto.courierName!.trim(),
+            dispatchedAt: now,
+          }
+        : {}),
+      ...(next === PharmacyFulfillmentStatus.DELIVERED
+        ? { deliveredAt: now }
+        : {}),
+      ...(next === PharmacyFulfillmentStatus.CANCELLED
+        ? {
+            cancelledAt: now,
+            cancellationReason: dto.cancellationReason!.trim(),
+          }
+        : {}),
+    };
+    const fulfillment = await this.prisma.medicationFulfillment.update({
+      where: { id },
+      data,
+    });
+    await this.auditEpisodeEvent(
+      actor.id,
+      `MEDICATION_FULFILLMENT_${next}`,
+      current.medicationOrder.episodeId,
+      { medicationOrderId: current.medicationOrderId, fulfillmentId: id },
+    );
+    return fulfillment;
   }
 
   async processMedicationSchedules(now = new Date()) {

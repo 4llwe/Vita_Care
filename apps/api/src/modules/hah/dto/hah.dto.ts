@@ -174,6 +174,27 @@ export class UpdateMedicationStatusDto {
   @IsIn(["ACTIVE", "HELD", "COMPLETED", "CANCELLED"]) status!: string;
 }
 
+export class CreateMedicationFulfillmentDto {
+  @IsString() @MinLength(1) quantity!: string;
+  @IsString() @MinLength(10) deliveryAddress!: string;
+  @IsOptional() @IsString() requestNote?: string;
+}
+
+export class UpdateMedicationFulfillmentDto {
+  @IsIn([
+    "CLINICAL_REVIEW",
+    "APPROVED",
+    "PREPARING",
+    "OUT_FOR_DELIVERY",
+    "DELIVERED",
+    "CANCELLED",
+  ])
+  status!: string;
+  @IsOptional() @IsString() courierName?: string;
+  @IsOptional() @IsString() trackingNote?: string;
+  @IsOptional() @IsString() cancellationReason?: string;
+}
+
 export class AssignCareTeamDto {
   @IsString() healthWorkerId!: string;
   @IsIn(["PRIMARY_CLINICIAN", "CARE_COORDINATOR"]) type!: string;

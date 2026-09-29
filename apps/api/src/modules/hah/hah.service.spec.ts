@@ -4,6 +4,7 @@ import {
   ClinicalTaskStatus,
   DiagnosticOrderStatus,
   HaHEpisodeStatus,
+  PharmacyFulfillmentStatus,
 } from "@prisma/client";
 import { HaHService } from "./hah.service";
 
@@ -558,6 +559,80 @@ describe("HaHService diagnostic laboratory workflow", () => {
 
     expect(prisma.clinicalAlert.create).toHaveBeenCalled();
     expect(notify.enqueue).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});
+
+describe("HaHService pharmacy fulfillment workflow", () => {
+  it("menolak refill kedua ketika permintaan masih berjalan", async () => {
+    const prisma: any = {
+      medicationOrder: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "med-1",
+          episodeId: "episode-1",
+          status: "ACTIVE",
+          fulfillments: [],
+        }),
+      },
+      medicationFulfillment: {
+        findFirst: jest.fn().mockResolvedValue({ id: "fill-open" }),
+      },
+    };
+    await expect(
+      new HaHService(prisma, {} as any).requestMedicationFulfillment(
+        "med-1",
+        { quantity: "30 tablet", deliveryAddress: "Jl. Sehat No. 10, Mataram" },
+        "patient-1",
+      ),
+    ).rejects.toThrow(/masih berjalan/i);
+  });
+
+  it("mewajibkan dokter untuk menyetujui refill", async () => {
+    const prisma: any = {
+      medicationFulfillment: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "fill-1",
+          medicationOrderId: "med-1",
+          status: PharmacyFulfillmentStatus.CLINICAL_REVIEW,
+          medicationOrder: { episodeId: "episode-1" },
+        }),
+      },
+    };
+    await expect(
+      new HaHService(prisma, {} as any).updateMedicationFulfillment(
+        "fill-1",
+        { status: "APPROVED" },
+        { id: "pharmacist-1", role: "HEALTH_WORKER", roles: ["HEALTH_WORKER"] } as any,
+      ),
+    ).rejects.toThrow(/kewenangan dokter/i);
+  });
+
+  it("mencatat pengiriman beserta kurir dan audit", async () => {
+    const prisma: any = {
+      medicationFulfillment: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "fill-1",
+          medicationOrderId: "med-1",
+          status: PharmacyFulfillmentStatus.PREPARING,
+          medicationOrder: { episodeId: "episode-1" },
+        }),
+        update: jest.fn().mockResolvedValue({
+          id: "fill-1",
+          status: PharmacyFulfillmentStatus.OUT_FOR_DELIVERY,
+          courierName: "Tim Farmasi A",
+        }),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const result = await new HaHService(
+      prisma,
+      {} as any,
+    ).updateMedicationFulfillment(
+      "fill-1",
+      { status: "OUT_FOR_DELIVERY", courierName: "Tim Farmasi A" },
+      { id: "pharmacist-1", role: "HEALTH_WORKER", roles: ["HEALTH_WORKER"] } as any,
+    );
+    expect(result.status).toBe(PharmacyFulfillmentStatus.OUT_FOR_DELIVERY);
     expect(prisma.auditLog.create).toHaveBeenCalled();
   });
 });
