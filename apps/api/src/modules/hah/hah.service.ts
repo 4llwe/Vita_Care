@@ -2890,39 +2890,151 @@ export class HaHService {
     return result;
   }
 
-  markMessageRead(messageId: string) {
-
-    return this.prisma.haHClinicalMessage.update({
-
-      where: { id: messageId },
-
-      data: { readAt: new Date() },
-
+  async markMessageRead(episodeId: string, messageId: string, actorId: string) {
+    const message = await this.prisma.haHClinicalMessage.findFirst({
+      where: { id: messageId, episodeId },
+      select: { id: true },
     });
-
+    if (!message) throw new NotFoundException("Pesan klinis tidak ditemukan");
+    const receipt = await this.prisma.haHClinicalMessageReceipt.upsert({
+      where: { messageId_userId: { messageId, userId: actorId } },
+      create: { messageId, userId: actorId, readAt: new Date() },
+      update: { readAt: new Date() },
+    });
+    await this.auditEpisodeEvent(actorId, "CLINICAL_MESSAGE_READ", episodeId, {
+      messageId,
+    });
+    return receipt;
   }
 
-
-  listMessages(episodeId: string) {
+  listMessages(episodeId: string, actor: AuthActor) {
+    const clinical = actorHasAnyRole(actor, CLINICAL_ROLES);
     return this.prisma.haHClinicalMessage.findMany({
-      where: { episodeId },
-      include: { sender: { select: { id: true, name: true, role: true } } },
+      where: {
+        episodeId,
+        ...(clinical
+          ? {}
+          : {
+              OR: [
+                { audience: { in: ["ALL", "PATIENT_CAREGIVER"] } },
+                { senderId: actor.id },
+              ],
+            }),
+      },
+      include: {
+        sender: { select: { id: true, name: true, role: true } },
+        receipts: {
+          select: {
+            userId: true,
+            readAt: true,
+            acknowledgedAt: true,
+            acknowledgementNote: true,
+            user: { select: { name: true, role: true } },
+          },
+        },
+      },
       orderBy: { createdAt: "asc" },
       take: 200,
     });
   }
-  sendMessage(episodeId: string, dto: SendClinicalMessageDto, senderId: string) {
-    return this.prisma.haHClinicalMessage.create({
+  async sendMessage(
+    episodeId: string,
+    dto: SendClinicalMessageDto,
+    actor: AuthActor,
+  ) {
+    const episode = await this.requireEpisode(episodeId);
+    const clinicalSender = actorHasAnyRole(actor, CLINICAL_ROLES);
+    if (dto.requiresAcknowledgement && !clinicalSender)
+      throw new ForbiddenException(
+        "Hanya tim klinis yang dapat meminta konfirmasi pesan",
+      );
+    if (dto.acknowledgementDueAt && !dto.requiresAcknowledgement)
+      throw new BadRequestException(
+        "Batas konfirmasi hanya berlaku untuk pesan yang memerlukan konfirmasi",
+      );
+    const dueAt = dto.acknowledgementDueAt
+      ? new Date(dto.acknowledgementDueAt)
+      : null;
+    if (dueAt && dueAt <= new Date())
+      throw new BadRequestException("Batas konfirmasi harus di masa depan");
+    const message = await this.prisma.haHClinicalMessage.create({
       data: {
         episodeId,
-        senderId,
-        body: dto.body,
+        senderId: actor.id,
+        body: dto.body.trim(),
         category: dto.category ?? "GENERAL",
         priority: dto.priority ?? "ROUTINE",
+        audience: dto.audience ?? "ALL",
+        requiresAcknowledgement: dto.requiresAcknowledgement ?? false,
+        acknowledgementDueAt: dueAt,
         attachmentUrls: dto.attachmentUrls ?? [],
       },
-      include: { sender: { select: { id: true, name: true, role: true } } },
+      include: {
+        sender: { select: { id: true, name: true, role: true } },
+        receipts: true,
+      },
     });
+    if (dto.priority === "URGENT") {
+      await this.prisma.clinicalAlert.create({
+        data: {
+          episodeId,
+          severity: ClinicalAlertSeverity.HIGH,
+          trigger: `Pesan mendesak: ${dto.body.trim().slice(0, 160)}`,
+          responseDueAt: new Date(Date.now() + 15 * 60_000),
+        },
+      });
+      await this.notify.enqueue({
+        channel: "in-app",
+        title: "Pesan klinis mendesak",
+        body: `${episode.code}: ${dto.body.trim().slice(0, 180)}`,
+      });
+    }
+    await this.auditEpisodeEvent(actor.id, "CLINICAL_MESSAGE_SENT", episodeId, {
+      messageId: message.id,
+      priority: message.priority,
+      category: message.category,
+      requiresAcknowledgement: message.requiresAcknowledgement,
+    });
+    return message;
+  }
+
+  async acknowledgeMessage(
+    episodeId: string,
+    messageId: string,
+    actorId: string,
+    note?: string,
+  ) {
+    const message = await this.prisma.haHClinicalMessage.findFirst({
+      where: { id: messageId, episodeId },
+    });
+    if (!message) throw new NotFoundException("Pesan klinis tidak ditemukan");
+    if (!message.requiresAcknowledgement)
+      throw new BadRequestException("Pesan ini tidak memerlukan konfirmasi");
+    if (message.senderId === actorId)
+      throw new BadRequestException("Pengirim tidak dapat mengonfirmasi pesannya sendiri");
+    const now = new Date();
+    const receipt = await this.prisma.haHClinicalMessageReceipt.upsert({
+      where: { messageId_userId: { messageId, userId: actorId } },
+      create: {
+        messageId,
+        userId: actorId,
+        readAt: now,
+        acknowledgedAt: now,
+        acknowledgementNote: note?.trim() || null,
+      },
+      update: {
+        readAt: now,
+        acknowledgedAt: now,
+        acknowledgementNote: note?.trim() || null,
+      },
+    });
+    await this.auditEpisodeEvent(
+      actorId,
+      "CLINICAL_MESSAGE_ACKNOWLEDGED",
+      episodeId,
+      { messageId, note: note?.trim() || null },
+    );
+    return receipt;
   }
 
   async escalateOverdueAlerts() {
@@ -3271,9 +3383,30 @@ export class HaHService {
           take: 100,
         },
         messages: {
+          ...(!isClinical && actor
+            ? {
+                where: {
+                  OR: [
+                    { audience: { in: ["ALL", "PATIENT_CAREGIVER"] } },
+                    { senderId: actor.id },
+                  ],
+                },
+              }
+            : {}),
           orderBy: { createdAt: "asc" },
           take: 200,
-          include: { sender: { select: { id: true, name: true, role: true } } },
+          include: {
+            sender: { select: { id: true, name: true, role: true } },
+            receipts: {
+              select: {
+                userId: true,
+                readAt: true,
+                acknowledgedAt: true,
+                acknowledgementNote: true,
+                user: { select: { name: true, role: true } },
+              },
+            },
+          },
         },
         observations: { orderBy: { recordedAt: "desc" }, take: 20 },
         alerts: { orderBy: { createdAt: "desc" } },

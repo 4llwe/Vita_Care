@@ -89,6 +89,10 @@ export default function WorkspacePage() {
   const [detail, setDetail] = useState<any>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [messagePriority, setMessagePriority] = useState("ROUTINE");
+  const [messageAudience, setMessageAudience] = useState("ALL");
+  const [requiresAcknowledgement, setRequiresAcknowledgement] = useState(false);
+  const [acknowledgementDueAt, setAcknowledgementDueAt] = useState("");
   const [session, setSession] = useState<Session | null>(null);
   const [caregivers, setCaregivers] = useState<any[]>([]);
   useEffect(() => {
@@ -113,6 +117,17 @@ export default function WorkspacePage() {
     session &&
     [session.role, ...(session.roles ?? [])].some((role) =>
       ["PATIENT", "COORDINATOR", "SUPER_ADMIN"].includes(role),
+    );
+  const canRequestAcknowledgement =
+    session &&
+    [session.role, ...(session.roles ?? [])].some((role) =>
+      [
+        "HEALTH_WORKER",
+        "DOCTOR",
+        "NURSE",
+        "COORDINATOR",
+        "SUPER_ADMIN",
+      ].includes(role),
     );
   useEffect(() => {
     if (!episodeId || module !== "keluarga" || !canManageCaregivers) return;
@@ -197,13 +212,46 @@ export default function WorkspacePage() {
       await api(`/hah/episodes/${episodeId}/messages`, {
         method: "POST",
         token: getToken(),
-        body: { body: message.trim(), category: communicationModules[module]?.category ?? "GENERAL" },
+        body: {
+          body: message.trim(),
+          category: communicationModules[module]?.category ?? "GENERAL",
+          priority: messagePriority,
+          audience: canRequestAcknowledgement ? messageAudience : "CARE_TEAM",
+          requiresAcknowledgement:
+            !!canRequestAcknowledgement && requiresAcknowledgement,
+          acknowledgementDueAt:
+            canRequestAcknowledgement &&
+            requiresAcknowledgement &&
+            acknowledgementDueAt
+              ? new Date(acknowledgementDueAt).toISOString()
+              : undefined,
+        },
       });
       setMessage("");
+      setMessagePriority("ROUTINE");
+      setRequiresAcknowledgement(false);
+      setAcknowledgementDueAt("");
       setDetail(await api(`/hah/episodes/${episodeId}`, { token: getToken() }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Pesan gagal dikirim");
     }
+  }
+  async function acknowledgeMessage(messageId: string) {
+    try {
+      await api(
+        `/hah/episodes/${episodeId}/messages/${messageId}/acknowledge`,
+        { method: "PATCH", token: getToken(), body: {} },
+      );
+      setDetail(await api(`/hah/episodes/${episodeId}`, { token: getToken() }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Konfirmasi pesan gagal");
+    }
+  }
+  function acknowledgedByCurrentUser(item: any) {
+    return (item.receipts ?? []).some(
+      (receipt: any) =>
+        receipt.userId === session?.id && receipt.acknowledgedAt,
+    );
   }
   return (
     <div className="space-y-6">
@@ -652,6 +700,35 @@ export default function WorkspacePage() {
                         <time>{new Date(item.createdAt).toLocaleString("id-ID")}</time>
                       </div>
                       <p className="mt-2 whitespace-pre-wrap">{item.body}</p>
+                      {item.requiresAcknowledgement ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">
+                            Perlu konfirmasi
+                          </span>
+                          {item.acknowledgementDueAt ? (
+                            <span className="text-xs text-slate-500">
+                              Batas{" "}
+                              {new Date(
+                                item.acknowledgementDueAt,
+                              ).toLocaleString("id-ID")}
+                            </span>
+                          ) : null}
+                          {item.senderId !== session?.id &&
+                          !acknowledgedByCurrentUser(item) ? (
+                            <button
+                              type="button"
+                              onClick={() => acknowledgeMessage(item.id)}
+                              className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-bold text-white"
+                            >
+                              Saya sudah memahami
+                            </button>
+                          ) : acknowledgedByCurrentUser(item) ? (
+                            <b className="text-xs text-emerald-700">
+                              ✓ Sudah dikonfirmasi
+                            </b>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </article>
                   ))
                 ) : (
@@ -675,6 +752,36 @@ export default function WorkspacePage() {
                   Kirim pesan
                 </button>
               </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <label className="text-xs font-bold">
+                  Prioritas
+                  <select value={messagePriority} onChange={(e) => setMessagePriority(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border px-3">
+                    <option value="ROUTINE">Rutin</option>
+                    <option value="URGENT">Mendesak — buat alert</option>
+                  </select>
+                </label>
+                {canRequestAcknowledgement ? (
+                  <label className="text-xs font-bold">
+                    Audiens
+                    <select value={messageAudience} onChange={(e) => setMessageAudience(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border px-3">
+                      <option value="ALL">Semua pihak</option>
+                      <option value="PATIENT_CAREGIVER">Pasien & caregiver</option>
+                      <option value="CARE_TEAM">Internal tim klinis</option>
+                    </select>
+                  </label>
+                ) : null}
+              </div>
+              {canRequestAcknowledgement ? (
+                <div className="mt-2 rounded-xl bg-amber-50 p-3">
+                  <label className="flex items-center gap-2 text-sm font-bold">
+                    <input type="checkbox" checked={requiresAcknowledgement} onChange={(e) => setRequiresAcknowledgement(e.target.checked)} />
+                    Wajib dikonfirmasi penerima
+                  </label>
+                  {requiresAcknowledgement ? (
+                    <input type="datetime-local" value={acknowledgementDueAt} onChange={(e) => setAcknowledgementDueAt(e.target.value)} required className="mt-2 min-h-11 w-full rounded-xl border px-3" aria-label="Batas waktu konfirmasi" />
+                  ) : null}
+                </div>
+              ) : null}
             </Card>
           </div>
         </div>
@@ -699,12 +806,28 @@ export default function WorkspacePage() {
                   <article key={item.id} className="rounded-xl border bg-white p-3">
                     <div className="flex justify-between gap-2 text-xs text-slate-500"><b className="text-slate-800">{item.sender?.name} · {item.sender?.role}</b><time>{new Date(item.createdAt).toLocaleString("id-ID")}</time></div>
                     <p className="mt-2 whitespace-pre-wrap">{item.body}</p>
+                    {item.priority === "URGENT" ? <span className="mt-2 inline-flex rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-800">Mendesak</span> : null}
+                    {item.requiresAcknowledgement ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">Perlu konfirmasi</span>
+                        {item.senderId !== session?.id && !acknowledgedByCurrentUser(item) ? (
+                          <button type="button" onClick={() => acknowledgeMessage(item.id)} className="rounded-lg bg-teal-700 px-3 py-2 text-xs font-bold text-white">Saya sudah memahami</button>
+                        ) : acknowledgedByCurrentUser(item) ? (
+                          <b className="text-xs text-emerald-700">✓ Sudah dikonfirmasi</b>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </article>
                 ))
               ) : <Empty>Belum ada komunikasi untuk modul ini.</Empty>}
             </div>
             <div className="mt-3 grid gap-2">
               <textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={2000} aria-label={`Pesan ${title}`} className="min-h-24 rounded-xl border p-3" placeholder={communicationModules[module].prompt} />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="text-xs font-bold">Prioritas<select value={messagePriority} onChange={(e) => setMessagePriority(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border px-3"><option value="ROUTINE">Rutin</option><option value="URGENT">Mendesak — buat alert</option></select></label>
+                {canRequestAcknowledgement ? <label className="text-xs font-bold">Audiens<select value={messageAudience} onChange={(e) => setMessageAudience(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border px-3"><option value="ALL">Semua pihak</option><option value="PATIENT_CAREGIVER">Pasien & caregiver</option><option value="CARE_TEAM">Internal tim klinis</option></select></label> : null}
+              </div>
+              {canRequestAcknowledgement ? <div className="rounded-xl bg-amber-50 p-3"><label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={requiresAcknowledgement} onChange={(e) => setRequiresAcknowledgement(e.target.checked)} /> Wajib dikonfirmasi penerima</label>{requiresAcknowledgement ? <input type="datetime-local" value={acknowledgementDueAt} onChange={(e) => setAcknowledgementDueAt(e.target.value)} required className="mt-2 min-h-11 w-full rounded-xl border px-3" aria-label="Batas waktu konfirmasi" /> : null}</div> : null}
               <button type="button" onClick={sendMessage} disabled={!message.trim()} className="min-h-11 rounded-xl bg-teal-700 px-5 font-black text-white disabled:opacity-50">Kirim ke tim kesehatan</button>
             </div>
           </Card>

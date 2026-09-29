@@ -474,7 +474,13 @@ export class SendClinicalMessageDto {
   @IsIn(["GENERAL", "CARE_INSTRUCTION", "SYMPTOM_REPORT", "MEDICATION", "FOLLOW_UP"])
   category?: string;
   @IsOptional() @IsIn(["ROUTINE", "URGENT"]) priority?: string;
+  @IsOptional() @IsIn(["ALL", "PATIENT_CAREGIVER", "CARE_TEAM"]) audience?: string;
+  @IsOptional() @IsBoolean() requiresAcknowledgement?: boolean;
+  @IsOptional() @IsDateString() acknowledgementDueAt?: string;
   @IsOptional() @IsArray() attachmentUrls?: string[];
+}
+export class AcknowledgeClinicalMessageDto {
+  @IsOptional() @IsString() @MinLength(2) note?: string;
 }
 export class CreateClinicalProtocolDto {
   @IsString() @MinLength(3) name!: string;
