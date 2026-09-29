@@ -8,6 +8,7 @@ import {
   ClinicalTaskPriority,
   ClinicalTaskStatus,
   DiagnosticOrderStatus,
+  DiagnosticResultFlag,
   EquipmentAssignmentStatus,
   EmergencyAction,
   EmergencyEventStatus,
@@ -22,6 +23,7 @@ import { AuthActor, actorHasAnyRole, CLINICAL_ROLES } from "../../common/auth/ac
 import { NotificationService } from "../notification/notification.service";
 import {
   AdministerMedicationDto,
+  AcknowledgeDiagnosticDto,
   AssignCareTeamDto,
   ApproveClinicalProtocolDto,
   BreakGlassAccessDto,
@@ -46,6 +48,7 @@ import {
   SendClinicalMessageDto,
   TransferDto,
   UpdateEquipmentStatusDto,
+  UpdateDiagnosticStatusDto,
   UpdateClinicalTaskDto,
   UpdateMedicationStatusDto,
   UpdateVisitStatusDto,
@@ -752,23 +755,147 @@ export class HaHService {
     const e = await this.requireEpisode(id);
     if (!([HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]).includes(e.status))
       throw new BadRequestException("Order diagnostik memerlukan episode aktif");
-    return this.prisma.haHDiagnosticOrder.create({
+    const order = await this.prisma.haHDiagnosticOrder.create({
       data: { episodeId: id, ...dto, orderedById: actorId },
+    });
+    await this.auditEpisodeEvent(actorId, "DIAGNOSTIC_ORDERED", id, {
+      diagnosticOrderId: order.id,
+      testName: order.testName,
+      priority: order.priority,
+    });
+    return order;
+  }
+
+  async listDiagnostics(actor: AuthActor, status?: DiagnosticOrderStatus) {
+    const elevated = actorHasAnyRole(actor, ["SUPER_ADMIN", "COORDINATOR"]);
+    return this.prisma.haHDiagnosticOrder.findMany({
+      where: {
+        ...(status ? { status } : {}),
+        ...(elevated
+          ? {}
+          : {
+              episode: {
+                OR: [
+                  { attendingPhysicianId: actor.id },
+                  {
+                    careAssignments: {
+                      some: {
+                        isActive: true,
+                        healthWorker: { userId: actor.id },
+                        OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }],
+                      },
+                    },
+                  },
+                ],
+              },
+            }),
+      },
+      include: {
+        episode: { include: { patient: true } },
+      },
+      orderBy: [{ status: "asc" }, { priority: "desc" }, { orderedAt: "desc" }],
+      take: 250,
     });
   }
 
-  async resultDiagnostic(id: string, dto: DiagnosticResultDto) {
+  async updateDiagnosticStatus(
+    id: string,
+    dto: UpdateDiagnosticStatusDto,
+    actorId: string,
+  ) {
+    const order = await this.prisma.haHDiagnosticOrder.findUnique({
+      where: { id },
+    });
+    if (!order) throw new NotFoundException("Order diagnostik tidak ditemukan");
+    const next = dto.status as DiagnosticOrderStatus;
+    const transitions: Partial<
+      Record<DiagnosticOrderStatus, DiagnosticOrderStatus[]>
+    > = {
+      [DiagnosticOrderStatus.ORDERED]: [
+        DiagnosticOrderStatus.COLLECTED,
+        DiagnosticOrderStatus.CANCELLED,
+      ],
+      [DiagnosticOrderStatus.COLLECTED]: [
+        DiagnosticOrderStatus.PROCESSING,
+        DiagnosticOrderStatus.CANCELLED,
+      ],
+      [DiagnosticOrderStatus.PROCESSING]: [DiagnosticOrderStatus.CANCELLED],
+    };
+    if (!(transitions[order.status] ?? []).includes(next))
+      throw new BadRequestException(
+        `Transisi diagnostik ${order.status} → ${next} tidak diizinkan`,
+      );
+    if (
+      next === DiagnosticOrderStatus.CANCELLED &&
+      !dto.cancellationReason?.trim()
+    )
+      throw new BadRequestException("Alasan pembatalan wajib dicatat");
+    const now = new Date();
+    const updated = await this.prisma.haHDiagnosticOrder.update({
+      where: { id },
+      data:
+        next === DiagnosticOrderStatus.COLLECTED
+          ? {
+              status: next,
+              collectedAt: now,
+              collectedById: actorId,
+              collectionNote: dto.collectionNote?.trim() || null,
+            }
+          : next === DiagnosticOrderStatus.PROCESSING
+            ? { status: next, processingAt: now }
+            : {
+                status: next,
+                cancelledAt: now,
+                cancellationReason: dto.cancellationReason!.trim(),
+              },
+    });
+    await this.auditEpisodeEvent(
+      actorId,
+      next === DiagnosticOrderStatus.CANCELLED
+        ? "DIAGNOSTIC_CANCELLED"
+        : `DIAGNOSTIC_${next}`,
+      order.episodeId,
+      {
+        diagnosticOrderId: id,
+        collectionNote: dto.collectionNote,
+        cancellationReason: dto.cancellationReason,
+      },
+    );
+    return updated;
+  }
+
+  async resultDiagnostic(
+    id: string,
+    dto: DiagnosticResultDto,
+    actorId: string,
+  ) {
     const order = await this.prisma.haHDiagnosticOrder.findUnique({
       where: { id },
       include: { episode: true },
     });
     if (!order) throw new NotFoundException("Order diagnostik tidak ditemukan");
+    if (
+      !(
+        [
+          DiagnosticOrderStatus.COLLECTED,
+          DiagnosticOrderStatus.PROCESSING,
+        ] as DiagnosticOrderStatus[]
+      ).includes(order.status)
+    )
+      throw new BadRequestException(
+        "Hasil hanya dapat dicatat setelah spesimen dikoleksi atau diproses",
+      );
     const result = await this.prisma.haHDiagnosticOrder.update({
       where: { id },
       data: {
+        resultValue: dto.resultValue?.trim() || null,
+        resultUnit: dto.resultUnit?.trim() || null,
+        referenceRange: dto.referenceRange?.trim() || null,
+        resultFlag: dto.resultFlag as DiagnosticResultFlag,
         resultText: dto.resultText,
         criticalResult: dto.criticalResult,
         resultedAt: new Date(),
+        resultedById: actorId,
         status: DiagnosticOrderStatus.RESULTED,
       },
     });
@@ -787,24 +914,40 @@ export class HaHService {
         body: `${order.episode.code}: ${order.testName}`,
       });
     }
+    await this.auditEpisodeEvent(actorId, "DIAGNOSTIC_RESULT_RECORDED", order.episodeId, {
+      diagnosticOrderId: id,
+      resultFlag: dto.resultFlag,
+      criticalResult: dto.criticalResult,
+    });
     return result;
   }
 
-  async acknowledgeDiagnostic(id: string, actorId: string) {
+  async acknowledgeDiagnostic(
+    id: string,
+    dto: AcknowledgeDiagnosticDto,
+    actorId: string,
+  ) {
     const order = await this.prisma.haHDiagnosticOrder.findUnique({
       where: { id },
     });
     if (!order) throw new NotFoundException("Order diagnostik tidak ditemukan");
-    if (!order.resultedAt)
+    if (!order.resultedAt || order.status !== DiagnosticOrderStatus.RESULTED)
       throw new BadRequestException("Hasil diagnostik belum tersedia");
-    return this.prisma.haHDiagnosticOrder.update({
+    const result = await this.prisma.haHDiagnosticOrder.update({
       where: { id },
       data: {
         status: DiagnosticOrderStatus.ACKNOWLEDGED,
         acknowledgedById: actorId,
         acknowledgedAt: new Date(),
+        acknowledgementNote: dto.acknowledgementNote.trim(),
       },
     });
+    await this.auditEpisodeEvent(actorId, "DIAGNOSTIC_RESULT_ACKNOWLEDGED", order.episodeId, {
+      diagnosticOrderId: id,
+      criticalResult: order.criticalResult,
+      acknowledgementNote: dto.acknowledgementNote,
+    });
+    return result;
   }
 
   async assignEquipment(id: string, dto: CreateEquipmentAssignmentDto, actorId: string) {

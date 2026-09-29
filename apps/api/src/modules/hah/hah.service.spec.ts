@@ -2,6 +2,7 @@ import { BadRequestException } from "@nestjs/common";
 import {
   CareAssignmentType,
   ClinicalTaskStatus,
+  DiagnosticOrderStatus,
   HaHEpisodeStatus,
 } from "@prisma/client";
 import { HaHService } from "./hah.service";
@@ -457,6 +458,106 @@ describe("HaHService clinical task workflow", () => {
     );
 
     expect(result.status).toBe(ClinicalTaskStatus.COMPLETED);
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});
+
+describe("HaHService diagnostic laboratory workflow", () => {
+  it("menerapkan transisi koleksi spesimen dan mencatat audit", async () => {
+    const prisma: any = {
+      haHDiagnosticOrder: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "lab-1",
+          episodeId: "episode-1",
+          status: DiagnosticOrderStatus.ORDERED,
+        }),
+        update: jest.fn().mockResolvedValue({
+          id: "lab-1",
+          status: DiagnosticOrderStatus.COLLECTED,
+        }),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+
+    const result = await new HaHService(
+      prisma,
+      {} as any,
+    ).updateDiagnosticStatus(
+      "lab-1",
+      { status: "COLLECTED", collectionNote: "Tabung EDTA diterima baik" },
+      "nurse-1",
+    );
+
+    expect(result.status).toBe(DiagnosticOrderStatus.COLLECTED);
+    expect(prisma.haHDiagnosticOrder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ collectedById: "nurse-1" }),
+      }),
+    );
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("menolak hasil sebelum spesimen dikoleksi", async () => {
+    const prisma: any = {
+      haHDiagnosticOrder: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "lab-1",
+          episodeId: "episode-1",
+          status: DiagnosticOrderStatus.ORDERED,
+          episode: { code: "HAH-001" },
+        }),
+      },
+    };
+
+    await expect(
+      new HaHService(prisma, {} as any).resultDiagnostic(
+        "lab-1",
+        {
+          resultFlag: "NORMAL",
+          resultText: "Dalam rentang referensi",
+          criticalResult: false,
+        },
+        "lab-user-1",
+      ),
+    ).rejects.toThrow(/setelah spesimen dikoleksi/i);
+  });
+
+  it("membuat alert dan audit untuk hasil kritis", async () => {
+    const prisma: any = {
+      haHDiagnosticOrder: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "lab-1",
+          episodeId: "episode-1",
+          testName: "Kalium",
+          status: DiagnosticOrderStatus.PROCESSING,
+          episode: { code: "HAH-001" },
+        }),
+        update: jest.fn().mockResolvedValue({
+          id: "lab-1",
+          status: DiagnosticOrderStatus.RESULTED,
+          criticalResult: true,
+        }),
+      },
+      clinicalAlert: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const notify = { enqueue: jest.fn().mockResolvedValue({}) };
+
+    await new HaHService(prisma, notify as any).resultDiagnostic(
+      "lab-1",
+      {
+        resultValue: "6.8",
+        resultUnit: "mmol/L",
+        referenceRange: "3.5–5.1",
+        resultFlag: "HIGH",
+        resultText: "Hiperkalemia kritis",
+        criticalResult: true,
+      },
+      "lab-user-1",
+    );
+
+    expect(prisma.clinicalAlert.create).toHaveBeenCalled();
+    expect(notify.enqueue).toHaveBeenCalled();
     expect(prisma.auditLog.create).toHaveBeenCalled();
   });
 });

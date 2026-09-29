@@ -14,6 +14,7 @@ const label: Record<string, string> = {
   "clinical-protocol": "Protokol EWS",
   "service-requests": "Permintaan Layanan",
   tasks: "Tugas Klinis",
+  diagnostics: "Laboratorium & Diagnostik",
   users: "Manajemen Pengguna",
   reports: "Pusat Laporan",
   settings: "Status Konfigurasi",

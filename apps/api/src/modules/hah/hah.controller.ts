@@ -8,13 +8,19 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import { ClinicalTaskStatus, HaHEpisodeStatus } from "@prisma/client";
+import {
+  ClinicalTaskStatus,
+  DiagnosticOrderStatus,
+  HaHEpisodeStatus,
+} from "@prisma/client";
+import { AuthActor } from "../../common/auth/actor";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import {
   AdministerMedicationDto,
+  AcknowledgeDiagnosticDto,
   AssignCareTeamDto,
   ApproveClinicalProtocolDto,
   BreakGlassAccessDto,
@@ -41,6 +47,7 @@ import {
   SendClinicalMessageDto,
   TransferDto,
   UpdateEquipmentStatusDto,
+  UpdateDiagnosticStatusDto,
   UpdateClinicalTaskDto,
   UpdateMedicationStatusDto,
   UpdateVisitStatusDto,
@@ -169,16 +176,43 @@ export class HaHController {
     return this.hah.createDiagnosticOrder(id, dto, u.id);
   }
 
+  @Get("diagnostics")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  diagnostics(
+    @CurrentUser() actor: AuthActor,
+    @Query("status") status?: DiagnosticOrderStatus,
+  ) {
+    return this.hah.listDiagnostics(actor, status);
+  }
+
+  @Patch("diagnostics/:id/status")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "SUPER_ADMIN")
+  diagnosticStatus(
+    @Param("id") id: string,
+    @Body() dto: UpdateDiagnosticStatusDto,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.updateDiagnosticStatus(id, dto, u.id);
+  }
+
   @Patch("diagnostics/:id/result")
   @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "SUPER_ADMIN")
-  diagnosticResult(@Param("id") id: string, @Body() dto: DiagnosticResultDto) {
-    return this.hah.resultDiagnostic(id, dto);
+  diagnosticResult(
+    @Param("id") id: string,
+    @Body() dto: DiagnosticResultDto,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.resultDiagnostic(id, dto, u.id);
   }
 
   @Patch("diagnostics/:id/acknowledge")
   @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "SUPER_ADMIN")
-  diagnosticAck(@Param("id") id: string, @CurrentUser() u: { id: string }) {
-    return this.hah.acknowledgeDiagnostic(id, u.id);
+  diagnosticAck(
+    @Param("id") id: string,
+    @Body() dto: AcknowledgeDiagnosticDto,
+    @CurrentUser() u: { id: string },
+  ) {
+    return this.hah.acknowledgeDiagnostic(id, dto, u.id);
   }
 
   @Post("episodes/:id/equipment")

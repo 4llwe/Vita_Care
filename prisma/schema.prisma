@@ -715,6 +715,14 @@ enum DiagnosticOrderStatus {
   CANCELLED
 }
 
+enum DiagnosticResultFlag {
+  NORMAL
+  LOW
+  HIGH
+  ABNORMAL
+  INDETERMINATE
+}
+
 enum EquipmentAssignmentStatus {
   REQUESTED
   DELIVERED
@@ -1145,23 +1153,36 @@ model HaHTransfer {
 
 
 model HaHDiagnosticOrder {
-  id                 String                @id @default(cuid())
-  episodeId          String
-  episode            HaHEpisode            @relation(fields: [episodeId], references: [id], onDelete: Cascade)
-  category           String
-  testName           String
-  specimen           String?
-  priority           String                @default("ROUTINE")
-  status             DiagnosticOrderStatus @default(ORDERED)
-  orderedById        String
-  orderedAt          DateTime              @default(now())
-  collectedAt        DateTime?
-  resultedAt         DateTime?
-  resultText         String?
-  criticalResult     Boolean               @default(false)
-  acknowledgedById   String?
-  acknowledgedAt     DateTime?
+  id                  String                @id @default(cuid())
+  episodeId           String
+  episode             HaHEpisode            @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  category            String
+  testName            String
+  specimen            String?
+  priority            String                @default("ROUTINE")
+  status              DiagnosticOrderStatus @default(ORDERED)
+  orderedById         String
+  orderedAt           DateTime              @default(now())
+  collectedAt         DateTime?
+  collectedById       String?
+  collectionNote      String?
+  processingAt        DateTime?
+  resultedAt          DateTime?
+  resultedById        String?
+  resultValue         String?
+  resultUnit          String?
+  referenceRange      String?
+  resultFlag          DiagnosticResultFlag?
+  resultText          String?
+  criticalResult      Boolean               @default(false)
+  acknowledgedById    String?
+  acknowledgedAt      DateTime?
+  acknowledgementNote String?
+  cancelledAt         DateTime?
+  cancellationReason  String?
+  updatedAt           DateTime              @updatedAt
   @@index([episodeId, status])
+  @@index([status, priority, orderedAt])
 }
 
 model HaHEquipmentAssignment {

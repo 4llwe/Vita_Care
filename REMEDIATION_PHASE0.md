@@ -125,5 +125,11 @@
 - Added a responsive personal task board with overdue and STAT/urgent visual indicators.
 - Task creation, status changes, outcomes, and handovers remain attached to the episode and are written to the audit trail.
 
+## Phase 2.6 — diagnostic and laboratory safety workflow
+- Extended existing diagnostic orders instead of replacing them: `ORDERED → COLLECTED → PROCESSING → RESULTED → ACKNOWLEDGED`, with controlled cancellation and auditable transitions.
+- Added specimen-collection metadata, structured result value/unit/reference range, result flags, critical-result alerts, and documented physician acknowledgement.
+- Added a responsive role-based laboratory workboard at `/diagnostics`; episode pages remain the source for new orders and link into the structured result workflow.
+- Preserved caregiver diagnostic-consent filtering and episode access controls while allowing nurses to document collection and qualified diagnostic professionals to enter results.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.
