@@ -279,6 +279,76 @@ describe("HaHService safe clinical communication", () => {
   });
 });
 
+describe("HaHService allergy and medication reconciliation safety", () => {
+  it("menolak duplikasi alergi aktif untuk pasien yang sama", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          patientId: "patient-1",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      haHAllergy: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "allergy-1",
+          substance: "Penisilin",
+          status: "ACTIVE",
+        }),
+      },
+    };
+    await expect(
+      new HaHService(prisma, {} as any).recordAllergy(
+        "episode-1",
+        {
+          substance: "Penisilin",
+          category: "DRUG",
+          reaction: "Urtikaria",
+          severity: "MODERATE",
+          verified: true,
+        },
+        "doctor-1",
+      ),
+    ).rejects.toThrow(/sudah tercatat/i);
+  });
+
+  it("menyimpan rekonsiliasi obat dan audit ketidaksesuaian", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          patientId: "patient-1",
+          status: HaHEpisodeStatus.ACTIVE,
+        }),
+      },
+      haHMedicationReconciliation: {
+        create: jest.fn().mockResolvedValue({
+          id: "reconciliation-1",
+          transitionType: "ADMISSION",
+        }),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const result = await new HaHService(
+      prisma,
+      {} as any,
+    ).createMedicationReconciliation(
+      "episode-1",
+      {
+        transitionType: "ADMISSION",
+        informationSources: ["Pasien", "Daftar obat sebelumnya"],
+        homeMedications: ["Amlodipin 5 mg sekali sehari"],
+        discrepancies: ["Dosis pada daftar lama berbeda"],
+        actionsTaken: "Dikonfirmasi kepada dokter penanggung jawab",
+        patientOrCaregiverInvolved: true,
+      },
+      "pharmacist-1",
+    );
+    expect(result.transitionType).toBe("ADMISSION");
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});
+
 describe("HaHService medication adherence", () => {
   it("memperbarui dosis terjadwal tanpa membuat catatan duplikat", async () => {
     const planned = {

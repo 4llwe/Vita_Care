@@ -214,6 +214,26 @@ export class CreateMedicationOrderDto {
   scheduleAt?: string[];
 }
 
+export class RecordAllergyDto {
+  @IsString() @MinLength(2) substance!: string;
+  @IsIn(["DRUG", "FOOD", "ENVIRONMENT", "OTHER"]) category!: string;
+  @IsString() @MinLength(2) reaction!: string;
+  @IsIn(["MILD", "MODERATE", "SEVERE", "UNKNOWN"]) severity!: string;
+  @IsBoolean() verified!: boolean;
+  @IsOptional() @IsString() note?: string;
+}
+
+export class CreateMedicationReconciliationDto {
+  @IsIn(["ADMISSION", "TRANSFER", "DISCHARGE", "ROUTINE"])
+  transitionType!: string;
+  @IsArray() @ArrayMinSize(1) @IsString({ each: true })
+  informationSources!: string[];
+  @IsArray() @IsString({ each: true }) homeMedications!: string[];
+  @IsArray() @IsString({ each: true }) discrepancies!: string[];
+  @IsString() @MinLength(3) actionsTaken!: string;
+  @IsBoolean() patientOrCaregiverInvolved!: boolean;
+}
+
 export class AdministerMedicationDto {
   @IsDateString() scheduledAt!: string;
   @IsIn(["GIVEN", "OMITTED", "REFUSED", "DELAYED"]) status!: string;

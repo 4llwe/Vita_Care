@@ -697,6 +697,194 @@ export default function EpisodePage() {
               </form>
             </Panel>
             <Panel title="Medication order">
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <h3 className="font-bold text-red-950">Alergi dan reaksi obat</h3>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[
+                    ...(Array.isArray(d.patient.allergies)
+                      ? d.patient.allergies.map((substance: string) => ({
+                          id: `legacy-${substance}`,
+                          substance,
+                          reaction: "Detail reaksi belum terstruktur",
+                          severity: "UNKNOWN",
+                          verifiedAt: null,
+                        }))
+                      : []),
+                    ...(d.patient.allergyRecords ?? []),
+                  ].length ? (
+                    [
+                      ...(Array.isArray(d.patient.allergies)
+                        ? d.patient.allergies.map((substance: string) => ({
+                            id: `legacy-${substance}`,
+                            substance,
+                            reaction: "Detail reaksi belum terstruktur",
+                            severity: "UNKNOWN",
+                            verifiedAt: null,
+                          }))
+                        : []),
+                      ...(d.patient.allergyRecords ?? []),
+                    ].map((allergy: any) => (
+                      <span
+                        key={allergy.id}
+                        className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs text-red-900"
+                        title={allergy.reaction}
+                      >
+                        <b>{allergy.substance}</b> · {allergy.severity}
+                        {allergy.verifiedAt ? " · terverifikasi" : " · belum terverifikasi"}
+                      </span>
+                    ))
+                  ) : (
+                    <b className="text-sm text-slate-600">
+                      Belum ada alergi yang tercatat — tetap lakukan verifikasi.
+                    </b>
+                  )}
+                </div>
+              </div>
+              <form
+                className="space-y-3 rounded-xl border border-red-100 p-4"
+                onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  submit(`/hah/episodes/${id}/allergies`, {
+                    substance: f.get("allergySubstance"),
+                    category: f.get("allergyCategory"),
+                    reaction: f.get("allergyReaction"),
+                    severity: f.get("allergySeverity"),
+                    verified: f.get("allergyVerified") === "on",
+                    note: f.get("allergyNote") || undefined,
+                  });
+                }}
+              >
+                <h3 className="font-bold">Catat alergi terstruktur</h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Zat / obat">
+                    <input name="allergySubstance" required className={input} />
+                  </Field>
+                  <Field label="Kategori">
+                    <select name="allergyCategory" className={input}>
+                      <option value="DRUG">Obat</option>
+                      <option value="FOOD">Makanan</option>
+                      <option value="ENVIRONMENT">Lingkungan</option>
+                      <option value="OTHER">Lainnya</option>
+                    </select>
+                  </Field>
+                  <Field label="Reaksi yang dialami">
+                    <input name="allergyReaction" required className={input} />
+                  </Field>
+                  <Field label="Keparahan">
+                    <select name="allergySeverity" className={input}>
+                      <option value="UNKNOWN">Belum diketahui</option>
+                      <option value="MILD">Ringan</option>
+                      <option value="MODERATE">Sedang</option>
+                      <option value="SEVERE">Berat</option>
+                    </select>
+                  </Field>
+                </div>
+                <Field label="Catatan">
+                  <textarea name="allergyNote" className={input} />
+                </Field>
+                <label className="flex items-center gap-2 text-sm font-semibold">
+                  <input name="allergyVerified" type="checkbox" />
+                  Riwayat alergi telah diverifikasi tenaga kesehatan
+                </label>
+                <button className={btn} disabled={busy}>Simpan alergi</button>
+              </form>
+              <form
+                className="space-y-3 rounded-xl border border-blue-100 p-4"
+                onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  const lines = (name: string) =>
+                    String(f.get(name) || "")
+                      .split("\n")
+                      .map((value) => value.trim())
+                      .filter(Boolean);
+                  submit(`/hah/episodes/${id}/medication-reconciliations`, {
+                    transitionType: f.get("reconciliationTransition"),
+                    informationSources: lines("reconciliationSources"),
+                    homeMedications: lines("homeMedications"),
+                    discrepancies: lines("medicationDiscrepancies"),
+                    actionsTaken: f.get("reconciliationActions"),
+                    patientOrCaregiverInvolved:
+                      f.get("patientOrCaregiverInvolved") === "on",
+                  });
+                }}
+              >
+                <h3 className="font-bold">Rekonsiliasi obat</h3>
+                <Field label="Tahap transisi">
+                  <select name="reconciliationTransition" className={input}>
+                    <option value="ADMISSION">Masuk program</option>
+                    <option value="ROUTINE">Peninjauan rutin</option>
+                    <option value="TRANSFER">Transfer / rujukan</option>
+                    <option value="DISCHARGE">Pulang / discharge</option>
+                  </select>
+                </Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Sumber informasi (satu per baris)">
+                    <textarea
+                      name="reconciliationSources"
+                      required
+                      placeholder={"Pasien\nCaregiver\nDaftar obat sebelumnya"}
+                      className={input}
+                    />
+                  </Field>
+                  <Field label="Obat yang digunakan di rumah (satu per baris)">
+                    <textarea
+                      name="homeMedications"
+                      placeholder="Nama · dosis · rute · frekuensi"
+                      className={input}
+                    />
+                  </Field>
+                  <Field label="Ketidaksesuaian (satu per baris)">
+                    <textarea
+                      name="medicationDiscrepancies"
+                      placeholder="Kosongkan bila tidak ada"
+                      className={input}
+                    />
+                  </Field>
+                  <Field label="Tindakan penyelesaian">
+                    <textarea
+                      name="reconciliationActions"
+                      minLength={3}
+                      required
+                      className={input}
+                    />
+                  </Field>
+                </div>
+                <label className="flex items-center gap-2 text-sm font-semibold">
+                  <input name="patientOrCaregiverInvolved" type="checkbox" />
+                  Pasien/caregiver dilibatkan dan daftar obat dikonfirmasi
+                </label>
+                <button className={btn} disabled={busy}>
+                  Selesaikan rekonsiliasi
+                </button>
+              </form>
+              {d.medicationReconciliations?.length ? (
+                <div className="space-y-2">
+                  <h3 className="font-bold">Riwayat rekonsiliasi</h3>
+                  {d.medicationReconciliations.map((record: any) => (
+                    <article
+                      key={record.id}
+                      className="rounded-lg bg-blue-50 p-3 text-sm"
+                    >
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <b>{record.transitionType}</b>
+                        <time>
+                          {new Date(record.completedAt).toLocaleString("id-ID")}
+                        </time>
+                      </div>
+                      <p className="mt-2">{record.actionsTaken}</p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Ketidaksesuaian:{" "}
+                        {Array.isArray(record.discrepancies) &&
+                        record.discrepancies.length
+                          ? record.discrepancies.join("; ")
+                          : "Tidak ada"}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
               <form
                 className="space-y-3"
                 onSubmit={(e: FormEvent<HTMLFormElement>) => {
