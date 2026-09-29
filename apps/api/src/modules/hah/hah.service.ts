@@ -15,6 +15,7 @@ import {
   HaHEvaluationDisposition,
   HaHEligibilityDecision,
   HaHEpisodeStatus,
+  HaHTransferStatus,
   HaHVisitStatus,
   MedicationOrderStatus,
   PharmacyFulfillmentStatus,
@@ -65,6 +66,7 @@ import {
   RecordObservationDto,
   SendClinicalMessageDto,
   TransferDto,
+  UpdateTransferDto,
   UpdateEquipmentStatusDto,
   UpdateDiagnosticStatusDto,
   UpdateClinicalTaskDto,
@@ -848,13 +850,33 @@ export class HaHService {
     const e = await this.requireEpisode(id);
     if (!([HaHEpisodeStatus.ADMITTED, HaHEpisodeStatus.ACTIVE] as HaHEpisodeStatus[]).includes(e.status))
       throw new BadRequestException("Episode tidak aktif");
+    const openTransfer = await this.prisma.haHTransfer.findFirst({
+      where: {
+        episodeId: id,
+        status: {
+          in: [
+            HaHTransferStatus.REQUESTED,
+            HaHTransferStatus.ACCEPTED,
+            HaHTransferStatus.DEPARTED,
+          ],
+        },
+      },
+    });
+    if (openTransfer)
+      throw new BadRequestException("Masih ada transfer aktif untuk episode ini");
     const [, transfer] = await this.prisma.$transaction([
       this.prisma.haHEpisode.update({
         where: { id },
         data: { status: HaHEpisodeStatus.TRANSFER_REQUESTED },
       }),
       this.prisma.haHTransfer.create({
-        data: { episodeId: id, ...dto, requestedById: actorId },
+        data: {
+          episodeId: id,
+          ...dto,
+          destinationUnit: dto.destinationUnit?.trim() || null,
+          transportProvider: dto.transportProvider?.trim() || null,
+          requestedById: actorId,
+        },
       }),
     ]);
     await this.notify.enqueue({
@@ -862,25 +884,128 @@ export class HaHService {
       title: `Transfer ${dto.urgency}`,
       body: `${e.code} ke ${dto.destination}: ${dto.reason}`,
     });
+    await this.auditEpisodeEvent(actorId, "TRANSFER_REQUESTED", id, {
+      transferId: transfer.id,
+      destination: dto.destination,
+      urgency: dto.urgency,
+    });
     return transfer;
   }
 
-  async completeTransfer(transferId: string) {
+  async updateTransfer(
+    transferId: string,
+    dto: UpdateTransferDto,
+    actorId: string,
+  ) {
     const transfer = await this.prisma.haHTransfer.findUnique({
       where: { id: transferId },
     });
     if (!transfer) throw new NotFoundException("Transfer tidak ditemukan");
-    const [, completed] = await this.prisma.$transaction([
+    const next = dto.status as HaHTransferStatus;
+    const transitions: Record<HaHTransferStatus, HaHTransferStatus[]> = {
+      [HaHTransferStatus.REQUESTED]: [
+        HaHTransferStatus.ACCEPTED,
+        HaHTransferStatus.REJECTED,
+        HaHTransferStatus.CANCELLED,
+      ],
+      [HaHTransferStatus.ACCEPTED]: [
+        HaHTransferStatus.DEPARTED,
+        HaHTransferStatus.CANCELLED,
+      ],
+      [HaHTransferStatus.DEPARTED]: [HaHTransferStatus.ARRIVED],
+      [HaHTransferStatus.REJECTED]: [],
+      [HaHTransferStatus.ARRIVED]: [],
+      [HaHTransferStatus.CANCELLED]: [],
+    };
+    if (!(transitions[transfer.status] ?? []).includes(next))
+      throw new BadRequestException(
+        `Transisi transfer ${transfer.status} → ${dto.status} tidak diizinkan`,
+      );
+
+    const required = (value: string | undefined, message: string) => {
+      if (!value?.trim()) throw new BadRequestException(message);
+      return value.trim();
+    };
+    const now = new Date();
+    const data: Record<string, unknown> = {
+      status: next,
+      updatedById: actorId,
+    };
+    if (dto.status === "ACCEPTED") {
+      data.receivingContact = required(
+        dto.receivingContact,
+        "Kontak penerima wajib dicatat",
+      );
+      data.acceptingClinician = required(
+        dto.acceptingClinician,
+        "Klinisi penerima wajib dicatat",
+      );
+      data.destinationUnit = dto.destinationUnit?.trim() || transfer.destinationUnit;
+      data.acceptedAt = now;
+    } else if (dto.status === "REJECTED") {
+      data.rejectionReason = required(
+        dto.rejectionReason,
+        "Alasan penolakan wajib dicatat",
+      );
+      data.rejectedAt = now;
+    } else if (dto.status === "DEPARTED") {
+      data.transportProvider = required(
+        dto.transportProvider || transfer.transportProvider || undefined,
+        "Penyedia transportasi wajib dicatat sebelum berangkat",
+      );
+      data.transportReference = required(
+        dto.transportReference,
+        "Referensi transportasi wajib dicatat",
+      );
+      data.departedAt = now;
+    } else if (dto.status === "ARRIVED") {
+      data.receivedBy = required(dto.receivedBy, "Penerima pasien wajib dicatat");
+      data.arrivalHandoverNote = required(
+        dto.arrivalHandoverNote,
+        "Konfirmasi handover saat tiba wajib dicatat",
+      );
+      data.arrivedAt = now;
+    } else {
+      data.cancellationReason = required(
+        dto.cancellationReason,
+        "Alasan pembatalan wajib dicatat",
+      );
+      data.cancelledAt = now;
+    }
+
+    const [, updated] = await this.prisma.$transaction([
       this.prisma.haHEpisode.update({
         where: { id: transfer.episodeId },
-        data: { status: HaHEpisodeStatus.TRANSFERRED },
+        data: {
+          status:
+            dto.status === "ARRIVED"
+              ? HaHEpisodeStatus.TRANSFERRED
+              : dto.status === "REJECTED" || dto.status === "CANCELLED"
+                ? HaHEpisodeStatus.ACTIVE
+                : HaHEpisodeStatus.TRANSFER_REQUESTED,
+        },
       }),
       this.prisma.haHTransfer.update({
         where: { id: transferId },
-        data: { arrivedAt: new Date() },
+        data,
       }),
     ]);
-    return completed;
+    await this.auditEpisodeEvent(
+      actorId,
+      `TRANSFER_${dto.status}`,
+      transfer.episodeId,
+      { transferId, destination: transfer.destination },
+    );
+    if (["REJECTED", "CANCELLED"].includes(dto.status)) {
+      await this.notify.enqueue({
+        channel: "in-app",
+        title: `Transfer ${dto.status === "REJECTED" ? "ditolak" : "dibatalkan"}`,
+        body: `${transfer.destination}: ${
+          dto.rejectionReason || dto.cancellationReason
+        }. Tim harus menentukan tujuan atau rencana alternatif.`,
+      });
+    }
+    return updated;
   }
 
   async discharge(id: string, dto: DischargeDto, actorId: string) {

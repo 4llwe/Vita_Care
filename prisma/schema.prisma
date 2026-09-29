@@ -122,6 +122,15 @@ enum ReferralUrgency {
   EMERGENCY
 }
 
+enum HaHTransferStatus {
+  REQUESTED
+  ACCEPTED
+  REJECTED
+  DEPARTED
+  ARRIVED
+  CANCELLED
+}
+
 model User {
   id          String   @id @default(cuid())
   email       String   @unique
@@ -1454,21 +1463,38 @@ model MedicationAdministration {
 }
 
 model HaHTransfer {
-  id                  String       @id @default(cuid())
-  episodeId           String
-  episode             HaHEpisode   @relation(fields: [episodeId], references: [id], onDelete: Cascade)
-  destination         String
-  reason              String
-  urgency             String
-  sbarHandover        String
-  transportProvider   String?
-  requestedById       String
-  requestedAt         DateTime     @default(now())
-  acceptedAt          DateTime?
-  departedAt          DateTime?
-  arrivedAt           DateTime?
+  id                   String            @id @default(cuid())
+  episodeId            String
+  episode              HaHEpisode        @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  destination          String
+  destinationUnit      String?
+  reason               String
+  urgency              String
+  status               HaHTransferStatus @default(REQUESTED)
+  sbarHandover         String
+  latestClinicalStatus String?
+  medicationSummary    String?
+  risksPrecautions     String?
+  familyNotified       Boolean           @default(false)
+  receivingContact     String?
+  acceptingClinician   String?
+  transportProvider    String?
+  transportReference   String?
+  receivedBy           String?
+  arrivalHandoverNote  String?
+  rejectionReason      String?
+  cancellationReason   String?
+  requestedById        String
+  updatedById          String?
+  requestedAt          DateTime          @default(now())
+  acceptedAt           DateTime?
+  rejectedAt           DateTime?
+  departedAt           DateTime?
+  arrivedAt            DateTime?
+  cancelledAt          DateTime?
 
   @@index([episodeId, requestedAt])
+  @@index([status, urgency, requestedAt])
 }
 
 
