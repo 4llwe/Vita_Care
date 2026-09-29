@@ -1,0 +1,22 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm prisma:generate && pnpm --filter api build",
+  "functions": {
+    "api/[...path].ts": {
+      "includeFiles": "prisma/**",
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/clinical-minute",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/capa-daily",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

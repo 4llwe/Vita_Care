@@ -162,6 +162,20 @@ requireText(
   "Hospital at Home API",
 );
 
+const vercel = JSON.parse(read("vercel.json"));
+if (!vercel.functions?.["api/[...path].ts"])
+  fail("Vercel API catch-all function is missing");
+const cronPaths = new Set((vercel.crons ?? []).map((cron) => cron.path));
+for (const path of ["/api/cron/clinical-minute", "/api/cron/capa-daily"])
+  if (!cronPaths.has(path)) fail(`Vercel cron is missing ${path}`);
+requireText(
+  read(
+    "apps/api/src/modules/serverless-cron/serverless-cron.controller.ts",
+  ),
+  ["timingSafeEqual", "CRON_SECRET", "processMedicationSchedules", "runDailyReminders"],
+  "Vercel serverless cron",
+);
+
 console.log(
   JSON.stringify({
     publicNavigation: { groups: groupKeys.length, submenu: submenu.length },
@@ -170,5 +184,6 @@ console.log(
     emergencyWorkflow: "pass",
     clinicalModels: clinicalModels.length,
     clinicalApi: "pass",
+    vercelServerless: "pass",
   }),
 );

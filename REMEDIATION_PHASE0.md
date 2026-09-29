@@ -234,5 +234,11 @@
 - Integrated environment-template validation into CI and full environment validation into preflight/predeploy checks without printing credentials.
 - Pinned Netlify installation to the committed lockfile and added HSTS, CSP, frame protection, and cross-origin opener security headers.
 
+## Phase 3.2 — full Vercel deployment compatibility
+- Added a Vercel catch-all serverless entry point that reuses the existing NestJS API instead of creating a replacement backend.
+- Added authenticated Vercel Cron endpoints for notification delivery, clinical-alert escalation, medication reminders, and daily CAPA processing so required automation is not silently lost without a persistent worker.
+- Added committed Vercel function limits and five-minute/daily schedules protected by an independent `CRON_SECRET`.
+- Documented the two existing Vercel project settings, pooled PostgreSQL/TLS Redis requirements, migration promotion order, health and cron verification, and the plan requirement for five-minute clinical scheduling.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

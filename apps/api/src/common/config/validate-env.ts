@@ -20,6 +20,7 @@ export function validateEnvironment() {
   if (!Number.isInteger(port) || port < 1 || port > 65535)
     throw new Error("API_PORT tidak valid");
   if (process.env.NODE_ENV !== "production") return;
+  if (process.env.VERCEL) strongSecret("CRON_SECRET");
   const webOrigin = required("WEB_ORIGIN");
   if (webOrigin.split(",").some((x) => !x.trim().startsWith("https://")))
     throw new Error("WEB_ORIGIN produksi wajib HTTPS");
