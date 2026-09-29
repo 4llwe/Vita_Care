@@ -1411,7 +1411,29 @@ model HaHEquipmentAssignment {
   deliveredAt        DateTime?
   returnedAt         DateTime?
   instructions       String?
+  safetyChecks       HaHEquipmentSafetyCheck[]
   @@index([episodeId, status])
+}
+
+model HaHEquipmentSafetyCheck {
+  id                    String                 @id @default(cuid())
+  equipmentAssignmentId String
+  equipmentAssignment   HaHEquipmentAssignment @relation(fields: [equipmentAssignmentId], references: [id], onDelete: Cascade)
+  operational           Boolean
+  powerSupply           String?
+  batteryPercent        Int?
+  consumableLevel       String?
+  cleanliness           String
+  alarmTested           Boolean                @default(false)
+  issueDescription      String?
+  actionTaken           String?
+  nextCheckAt           DateTime
+  checkedById           String
+  checkedAt             DateTime               @default(now())
+  createdAt             DateTime               @default(now())
+
+  @@index([equipmentAssignmentId, checkedAt])
+  @@index([operational, nextCheckAt])
 }
 
 model NotificationDelivery {

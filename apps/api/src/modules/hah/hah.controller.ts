@@ -33,6 +33,7 @@ import {
   CreateClinicalProtocolDto,
   CreateDiagnosticOrderDto,
   CreateEquipmentAssignmentDto,
+  CreateEquipmentSafetyCheckDto,
   CreateEpisodeDto,
   CreateMedicationOrderDto,
   CreateMedicationFulfillmentDto,
@@ -236,6 +237,30 @@ export class HaHController {
   @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
   equipmentStatus(@Param("id") id: string, @Body() dto: UpdateEquipmentStatusDto) {
     return this.hah.updateEquipment(id, dto);
+  }
+
+  @Get("equipment/:id/checks")
+  @Roles(
+    "PATIENT",
+    "CAREGIVER",
+    "HEALTH_WORKER",
+    "DOCTOR",
+    "NURSE",
+    "COORDINATOR",
+    "SUPER_ADMIN",
+  )
+  equipmentChecks(@Param("id") id: string) {
+    return this.hah.listEquipmentSafetyChecks(id);
+  }
+
+  @Post("equipment/:id/checks")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "SUPER_ADMIN")
+  createEquipmentCheck(
+    @Param("id") id: string,
+    @Body() dto: CreateEquipmentSafetyCheckDto,
+    @CurrentUser() actor: { id: string },
+  ) {
+    return this.hah.createEquipmentSafetyCheck(id, dto, actor.id);
   }
 
   @Get("patients")

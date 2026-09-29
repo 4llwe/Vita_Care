@@ -877,3 +877,42 @@ describe("HaHService patient education teach-back workflow", () => {
     expect(prisma.auditLog.create).toHaveBeenCalled();
   });
 });
+
+describe("HaHService equipment safety workflow", () => {
+  it("membuat alert bila alat tidak operasional", async () => {
+    const prisma: any = {
+      haHEquipmentAssignment: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "equipment-1",
+          episodeId: "episode-1",
+          equipmentType: "Oxygen concentrator",
+          status: "IN_USE",
+          episode: { code: "HAH-001" },
+        }),
+      },
+      haHEquipmentSafetyCheck: {
+        create: jest.fn().mockImplementation(({ data }) =>
+          Promise.resolve({ id: "check-1", ...data }),
+        ),
+      },
+      clinicalAlert: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const notify = { enqueue: jest.fn().mockResolvedValue({}) };
+    await new HaHService(prisma, notify as any).createEquipmentSafetyCheck(
+      "equipment-1",
+      {
+        operational: false,
+        cleanliness: "Bersih",
+        alarmTested: false,
+        issueDescription: "Tidak dapat menyala",
+        actionTaken: "Gunakan tabung cadangan dan hubungi supplier",
+        nextCheckAt: "2030-01-01T08:00:00Z",
+      },
+      "nurse-1",
+    );
+    expect(prisma.clinicalAlert.create).toHaveBeenCalled();
+    expect(notify.enqueue).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});

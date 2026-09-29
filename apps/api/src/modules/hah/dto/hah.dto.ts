@@ -366,6 +366,18 @@ export class UpdateEquipmentStatusDto {
   status!: string;
 }
 
+export class CreateEquipmentSafetyCheckDto {
+  @IsBoolean() operational!: boolean;
+  @IsOptional() @IsString() powerSupply?: string;
+  @IsOptional() @IsInt() @Min(0) @Max(100) batteryPercent?: number;
+  @IsOptional() @IsString() consumableLevel?: string;
+  @IsString() @MinLength(2) cleanliness!: string;
+  @IsBoolean() alarmTested!: boolean;
+  @IsOptional() @IsString() issueDescription?: string;
+  @IsOptional() @IsString() actionTaken?: string;
+  @IsDateString() nextCheckAt!: string;
+}
+
 export class GrantCaregiverAccessDto {
   @IsOptional() @IsString() caregiverUserId?: string;
   @IsOptional() @IsEmail() caregiverEmail?: string;
