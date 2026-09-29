@@ -38,6 +38,8 @@ import {
   CreateMedicationOrderDto,
   RecordAllergyDto,
   CreateMedicationReconciliationDto,
+  CreateSafetyIncidentDto,
+  ReviewSafetyIncidentDto,
   CreateMedicationFulfillmentDto,
   CreatePatientDto,
   CreateVisitDto,
@@ -343,6 +345,26 @@ export class HaHController {
     @CurrentUser() actor: AuthActor,
   ) {
     return this.hah.createMedicationReconciliation(id, dto, actor.id);
+  }
+
+  @Post("episodes/:id/safety-incidents")
+  @Roles("HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  reportSafetyIncident(
+    @Param("id") id: string,
+    @Body() dto: CreateSafetyIncidentDto,
+    @CurrentUser() actor: AuthActor,
+  ) {
+    return this.hah.reportSafetyIncident(id, dto, actor.id);
+  }
+
+  @Patch("safety-incidents/:id")
+  @Roles("DOCTOR", "COORDINATOR", "SUPER_ADMIN")
+  reviewSafetyIncident(
+    @Param("id") id: string,
+    @Body() dto: ReviewSafetyIncidentDto,
+    @CurrentUser() actor: AuthActor,
+  ) {
+    return this.hah.reviewSafetyIncident(id, dto, actor.id);
   }
 
   @Patch("medications/:id/status")

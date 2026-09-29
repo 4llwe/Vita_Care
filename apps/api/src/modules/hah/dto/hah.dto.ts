@@ -234,6 +234,27 @@ export class CreateMedicationReconciliationDto {
   @IsBoolean() patientOrCaregiverInvolved!: boolean;
 }
 
+export class CreateSafetyIncidentDto {
+  @IsIn(["MEDICATION", "FALL", "EQUIPMENT", "CARE_DELIVERY", "PRIVACY", "OTHER"])
+  category!: string;
+  @IsIn(["NO_HARM", "LOW", "MODERATE", "SEVERE", "SENTINEL"])
+  severity!: string;
+  @IsDateString() occurredAt!: string;
+  @IsString() @MinLength(10) description!: string;
+  @IsString() @MinLength(5) immediateAction!: string;
+  @IsString() @MinLength(5) patientCondition!: string;
+  @IsOptional() @IsString() witnesses?: string;
+  @IsBoolean() patientFamilyInformed!: boolean;
+}
+
+export class ReviewSafetyIncidentDto {
+  @IsIn(["UNDER_REVIEW", "ACTION_REQUIRED", "RESOLVED"])
+  status!: string;
+  @IsString() @MinLength(5) reviewSummary!: string;
+  @IsOptional() @IsString() rootCause?: string;
+  @IsOptional() @IsString() correctiveAction?: string;
+}
+
 export class AdministerMedicationDto {
   @IsDateString() scheduledAt!: string;
   @IsIn(["GIVEN", "OMITTED", "REFUSED", "DELAYED"]) status!: string;

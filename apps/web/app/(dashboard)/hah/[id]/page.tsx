@@ -64,6 +64,11 @@ export default function EpisodePage() {
         "SUPER_ADMIN",
       ].includes(role),
     );
+  const canReviewIncident =
+    session &&
+    [session.role, ...(session.roles ?? [])].some((role) =>
+      ["DOCTOR", "COORDINATOR", "SUPER_ADMIN"].includes(role),
+    );
   useEffect(() => {
     fetchMe().then(setSession).catch(() => undefined);
   }, []);
@@ -370,6 +375,164 @@ export default function EpisodePage() {
             ) : (
               <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
                 Belum ada tugas klinis.
+              </p>
+            )}
+          </div>
+        </Panel>
+        <Panel title="Insiden keselamatan pasien">
+          <p className="text-sm text-slate-600">
+            Catat insiden dan near-miss secara faktual. Modul ini tidak
+            menggantikan tindakan darurat atau clinical alert.
+          </p>
+          <form
+            className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4"
+            onSubmit={(e: FormEvent<HTMLFormElement>) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              submit(`/hah/episodes/${id}/safety-incidents`, {
+                category: f.get("incidentCategory"),
+                severity: f.get("incidentSeverity"),
+                occurredAt: new Date(
+                  String(f.get("incidentOccurredAt")),
+                ).toISOString(),
+                description: f.get("incidentDescription"),
+                immediateAction: f.get("incidentImmediateAction"),
+                patientCondition: f.get("incidentPatientCondition"),
+                witnesses: f.get("incidentWitnesses") || undefined,
+                patientFamilyInformed:
+                  f.get("incidentFamilyInformed") === "on",
+              });
+            }}
+          >
+            <h3 className="font-bold">Laporkan kejadian</h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Kategori">
+                <select name="incidentCategory" className={input}>
+                  <option value="MEDICATION">Obat</option>
+                  <option value="FALL">Jatuh</option>
+                  <option value="EQUIPMENT">Peralatan</option>
+                  <option value="CARE_DELIVERY">Pemberian layanan</option>
+                  <option value="PRIVACY">Privasi</option>
+                  <option value="OTHER">Lainnya</option>
+                </select>
+              </Field>
+              <Field label="Dampak">
+                <select name="incidentSeverity" className={input}>
+                  <option value="NO_HARM">Near-miss / tanpa cedera</option>
+                  <option value="LOW">Rendah</option>
+                  <option value="MODERATE">Sedang</option>
+                  <option value="SEVERE">Berat</option>
+                  <option value="SENTINEL">Sentinel</option>
+                </select>
+              </Field>
+              <Field label="Waktu kejadian">
+                <input
+                  name="incidentOccurredAt"
+                  type="datetime-local"
+                  required
+                  className={input}
+                />
+              </Field>
+              <Field label="Saksi (bila ada)">
+                <input name="incidentWitnesses" className={input} />
+              </Field>
+            </div>
+            <Field label="Deskripsi faktual kejadian">
+              <textarea
+                name="incidentDescription"
+                minLength={10}
+                required
+                className={input}
+              />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Tindakan segera">
+                <textarea
+                  name="incidentImmediateAction"
+                  minLength={5}
+                  required
+                  className={input}
+                />
+              </Field>
+              <Field label="Kondisi pasien setelah kejadian">
+                <textarea
+                  name="incidentPatientCondition"
+                  minLength={5}
+                  required
+                  className={input}
+                />
+              </Field>
+            </div>
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input name="incidentFamilyInformed" type="checkbox" />
+              Pasien/keluarga telah diberi informasi sesuai kebijakan
+            </label>
+            <button className={btn} disabled={busy}>Kirim laporan insiden</button>
+          </form>
+          <div className="space-y-3">
+            {d.safetyIncidents?.length ? (
+              d.safetyIncidents.map((incident: any) => (
+                <article
+                  key={incident.id}
+                  className={`rounded-xl border p-4 ${
+                    ["SEVERE", "SENTINEL"].includes(incident.severity)
+                      ? "border-red-300 bg-red-50"
+                      : incident.severity === "MODERATE"
+                        ? "border-amber-300 bg-amber-50"
+                        : "border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <div>
+                      <strong>
+                        {incident.category.replaceAll("_", " ")} ·{" "}
+                        {incident.severity.replaceAll("_", " ")}
+                      </strong>
+                      <p className="text-sm text-slate-600">
+                        {new Date(incident.occurredAt).toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                    <b>{incident.status.replaceAll("_", " ")}</b>
+                  </div>
+                  <p className="mt-2 text-sm">{incident.description}</p>
+                  <p className="mt-2 rounded-lg bg-white p-2 text-sm">
+                    <b>Tindakan segera:</b> {incident.immediateAction}
+                  </p>
+                  {canReviewIncident && incident.status !== "RESOLVED" ? (
+                    <form
+                      className="mt-3 grid gap-2 rounded-lg border bg-white p-3"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const f = new FormData(e.currentTarget);
+                        patch(`/hah/safety-incidents/${incident.id}`, {
+                          status: f.get("incidentNextStatus"),
+                          reviewSummary: f.get("incidentReviewSummary"),
+                          rootCause: f.get("incidentRootCause") || undefined,
+                          correctiveAction:
+                            f.get("incidentCorrectiveAction") || undefined,
+                        });
+                      }}
+                    >
+                      <select name="incidentNextStatus" className={input}>
+                        {incident.status === "REPORTED" ? (
+                          <option value="UNDER_REVIEW">Mulai review</option>
+                        ) : null}
+                        <option value="ACTION_REQUIRED">Perlu tindakan</option>
+                        {incident.status !== "REPORTED" ? (
+                          <option value="RESOLVED">Selesaikan</option>
+                        ) : null}
+                      </select>
+                      <textarea name="incidentReviewSummary" minLength={5} required placeholder="Ringkasan review" className={input} />
+                      <textarea name="incidentRootCause" placeholder="Akar masalah (wajib untuk resolusi)" className={input} />
+                      <textarea name="incidentCorrectiveAction" placeholder="Tindakan korektif (wajib bila perlu tindakan/resolusi)" className={input} />
+                      <button className={btn} disabled={busy}>Simpan review</button>
+                    </form>
+                  ) : null}
+                </article>
+              ))
+            ) : (
+              <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">
+                Belum ada insiden yang dilaporkan.
               </p>
             )}
           </div>
