@@ -222,5 +222,11 @@
 - Moderate, severe, and sentinel incidents create time-bound clinical alerts and team notifications for immediate review.
 - Review follows controlled states and cannot be resolved without documented root cause and corrective action; reporting and every review transition remain in the clinical audit trail.
 
+## Phase 3.0 — release acceptance and scope regression gate
+- Added an automated acceptance check for the agreed 14 public navigation groups, 117 submenu entries, role navigation, valid internal destinations, emergency workflow, clinical data model, and core Hospital at Home API routes.
+- Production readiness now fails if a future change removes a required menu, role destination, emergency action, clinical model, or operational endpoint.
+- Added a traceability matrix from the agreed requirements to the existing implementation and clearly separated automated evidence from operator sign-off.
+- Removed the remaining pre-existing web lint warning so the release gate reports a clean lint result.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.
