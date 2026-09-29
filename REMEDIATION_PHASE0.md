@@ -168,5 +168,11 @@
 - Partial understanding or a need for reinforcement requires a reinforcement plan and scheduled review.
 - Education records remain attached to the active episode and follow existing access, caregiver care-plan consent, and audit controls.
 
+## Phase 2.13 — home medical equipment safety checks
+- Extended existing episode equipment assignments with recurring operational safety checks instead of introducing a separate inventory.
+- Captures power supply, battery, consumable/oxygen level, cleanliness, alarm testing, identified issues, corrective actions, and next inspection.
+- Non-operational equipment requires a documented issue and action, creates a high-priority alert, and notifies the care team for replacement or repair.
+- Equipment safety records follow existing episode access, caregiver care-plan consent, and clinical audit trails.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

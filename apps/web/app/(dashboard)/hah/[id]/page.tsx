@@ -1370,6 +1370,53 @@ export default function EpisodePage() {
                       </button>
                     )}
                   </div>
+                  {["DELIVERED", "IN_USE"].includes(x.status) && (
+                    <form
+                      className="mt-4 space-y-3 border-t pt-4"
+                      onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                        e.preventDefault();
+                        const f = new FormData(e.currentTarget);
+                        submit(`/hah/equipment/${x.id}/checks`, {
+                          operational: f.get("operational") === "on",
+                          powerSupply: f.get("powerSupply") || undefined,
+                          batteryPercent:
+                            f.get("batteryPercent") === ""
+                              ? undefined
+                              : Number(f.get("batteryPercent")),
+                          consumableLevel:
+                            f.get("consumableLevel") || undefined,
+                          cleanliness: f.get("cleanliness"),
+                          alarmTested: f.get("alarmTested") === "on",
+                          issueDescription:
+                            f.get("issueDescription") || undefined,
+                          actionTaken: f.get("actionTaken") || undefined,
+                          nextCheckAt: new Date(
+                            String(f.get("equipmentNextCheck")),
+                          ).toISOString(),
+                        });
+                      }}
+                    >
+                      <p className="font-bold">Pemeriksaan keselamatan alat</p>
+                      <label className="flex gap-2"><input name="operational" type="checkbox" defaultChecked /> Alat operasional</label>
+                      <label className="flex gap-2"><input name="alarmTested" type="checkbox" /> Alarm diuji</label>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label="Sumber daya"><input name="powerSupply" className={input} /></Field>
+                        <Field label="Baterai (%)"><input name="batteryPercent" type="number" min="0" max="100" className={input} /></Field>
+                        <Field label="Level consumable/oksigen"><input name="consumableLevel" className={input} /></Field>
+                        <Field label="Kebersihan"><input name="cleanliness" required className={input} /></Field>
+                      </div>
+                      <Field label="Masalah ditemukan"><textarea name="issueDescription" className={input} /></Field>
+                      <Field label="Tindakan"><textarea name="actionTaken" className={input} /></Field>
+                      <Field label="Pemeriksaan berikutnya"><input name="equipmentNextCheck" type="datetime-local" required className={input} /></Field>
+                      <button className={btn} disabled={busy}>Simpan pemeriksaan alat</button>
+                    </form>
+                  )}
+                  {x.safetyChecks?.slice(0, 3).map((check: any) => (
+                    <div key={check.id} className={`mt-3 rounded-lg border p-2 ${check.operational ? "bg-white" : "border-red-300 bg-red-50"}`}>
+                      <b>{check.operational ? "Operasional" : "Tidak operasional"}</b> · {check.cleanliness}
+                      {check.issueDescription ? <p className="mt-1">{check.issueDescription}</p> : null}
+                    </div>
+                  ))}
                 </div>
               ))}
             </Panel>

@@ -53,6 +53,7 @@ import {
   CreateNutritionAssessmentDto,
   CreatePalliativeAssessmentDto,
   CreateEducationRecordDto,
+  CreateEquipmentSafetyCheckDto,
   DiagnosticResultDto,
   DischargeDto,
   EndCareAssignmentDto,
@@ -991,6 +992,84 @@ export class HaHService {
           : {}),
       },
     });
+  }
+
+  listEquipmentSafetyChecks(equipmentAssignmentId: string) {
+    return this.prisma.haHEquipmentSafetyCheck.findMany({
+      where: { equipmentAssignmentId },
+      orderBy: { checkedAt: "desc" },
+      take: 100,
+    });
+  }
+
+  async createEquipmentSafetyCheck(
+    equipmentAssignmentId: string,
+    dto: CreateEquipmentSafetyCheckDto,
+    actorId: string,
+  ) {
+    const equipment = await this.prisma.haHEquipmentAssignment.findUnique({
+      where: { id: equipmentAssignmentId },
+      include: { episode: true },
+    });
+    if (!equipment)
+      throw new NotFoundException("Penugasan alat tidak ditemukan");
+    if (
+      !(
+        [
+          EquipmentAssignmentStatus.DELIVERED,
+          EquipmentAssignmentStatus.IN_USE,
+        ] as EquipmentAssignmentStatus[]
+      ).includes(equipment.status)
+    )
+      throw new BadRequestException(
+        "Pemeriksaan hanya untuk alat yang sudah diterima atau digunakan",
+      );
+    if (
+      !dto.operational &&
+      (!dto.issueDescription?.trim() || !dto.actionTaken?.trim())
+    )
+      throw new BadRequestException(
+        "Masalah dan tindakan wajib dicatat untuk alat tidak operasional",
+      );
+    const nextCheckAt = new Date(dto.nextCheckAt);
+    if (nextCheckAt <= new Date())
+      throw new BadRequestException("Pemeriksaan berikutnya harus di masa depan");
+    const check = await this.prisma.haHEquipmentSafetyCheck.create({
+      data: {
+        equipmentAssignmentId,
+        operational: dto.operational,
+        powerSupply: dto.powerSupply?.trim() || null,
+        batteryPercent: dto.batteryPercent,
+        consumableLevel: dto.consumableLevel?.trim() || null,
+        cleanliness: dto.cleanliness.trim(),
+        alarmTested: dto.alarmTested,
+        issueDescription: dto.issueDescription?.trim() || null,
+        actionTaken: dto.actionTaken?.trim() || null,
+        nextCheckAt,
+        checkedById: actorId,
+      },
+    });
+    if (!dto.operational) {
+      await this.prisma.clinicalAlert.create({
+        data: {
+          episodeId: equipment.episodeId,
+          severity: ClinicalAlertSeverity.HIGH,
+          trigger: `Alat tidak operasional: ${equipment.equipmentType}`,
+          responseDueAt: new Date(Date.now() + 30 * 60_000),
+        },
+      });
+      await this.notify.enqueue({
+        channel: "in-app",
+        title: "Alat medis tidak operasional",
+        body: `${equipment.episode.code}: ${equipment.equipmentType} memerlukan penggantian atau perbaikan`,
+      });
+    }
+    await this.auditEpisodeEvent(actorId, "EQUIPMENT_SAFETY_CHECK_RECORDED", equipment.episodeId, {
+      equipmentAssignmentId,
+      safetyCheckId: check.id,
+      operational: check.operational,
+    });
+    return check;
   }
 
   listPatients(query?: string) {
@@ -2684,7 +2763,10 @@ export class HaHService {
         medicationOrders: { include: { administrations: true } },
         transfers: { orderBy: { requestedAt: "desc" } },
         diagnosticOrders: { orderBy: { orderedAt: "desc" } },
-        equipmentAssignments: { orderBy: { requestedAt: "desc" } },
+        equipmentAssignments: {
+          orderBy: { requestedAt: "desc" },
+          include: { safetyChecks: { orderBy: { checkedAt: "desc" } } },
+        },
       },
     });
     if (actor)
