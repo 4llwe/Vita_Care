@@ -1,6 +1,6 @@
 [build]
   base = "."
-  command = "corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --no-frozen-lockfile && pnpm --filter web build"
+  command = "corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --frozen-lockfile && pnpm --filter web build"
   publish = "apps/web/.next"
 
 [build.environment]
@@ -18,6 +18,9 @@
     Referrer-Policy = "no-referrer"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(self)"
     X-Frame-Options = "DENY"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    Cross-Origin-Opener-Policy = "same-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; frame-src https://www.google.com https://maps.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 
 [[headers]]
   for = "/_next/static/*"
