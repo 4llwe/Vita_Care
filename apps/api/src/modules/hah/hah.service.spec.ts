@@ -190,6 +190,95 @@ describe("HaHService safe transfer handoff", () => {
   });
 });
 
+describe("HaHService safe clinical communication", () => {
+  it("menolak permintaan konfirmasi dari pengirim nonklinis", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          code: "HAH-001",
+        }),
+      },
+    };
+    await expect(
+      new HaHService(prisma, {} as any).sendMessage(
+        "episode-1",
+        {
+          body: "Mohon konfirmasi instruksi ini",
+          requiresAcknowledgement: true,
+        },
+        { id: "patient-1", role: "PATIENT" },
+      ),
+    ).rejects.toThrow(/hanya tim klinis/i);
+  });
+
+  it("mengubah pesan mendesak menjadi alert klinis dan audit", async () => {
+    const prisma: any = {
+      haHEpisode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "episode-1",
+          code: "HAH-001",
+        }),
+      },
+      haHClinicalMessage: {
+        create: jest.fn().mockResolvedValue({
+          id: "message-1",
+          priority: "URGENT",
+          category: "SYMPTOM_REPORT",
+          requiresAcknowledgement: false,
+        }),
+      },
+      clinicalAlert: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const notify = { enqueue: jest.fn().mockResolvedValue({}) };
+    await new HaHService(prisma, notify as any).sendMessage(
+      "episode-1",
+      {
+        body: "Sesak terasa bertambah sejak satu jam terakhir",
+        category: "SYMPTOM_REPORT",
+        priority: "URGENT",
+      },
+      { id: "patient-1", role: "PATIENT" },
+    );
+    expect(prisma.clinicalAlert.create).toHaveBeenCalled();
+    expect(notify.enqueue).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("mencatat konfirmasi pesan penting per pengguna", async () => {
+    const prisma: any = {
+      haHClinicalMessage: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "message-1",
+          episodeId: "episode-1",
+          senderId: "nurse-1",
+          requiresAcknowledgement: true,
+        }),
+      },
+      haHClinicalMessageReceipt: {
+        upsert: jest.fn().mockResolvedValue({
+          messageId: "message-1",
+          userId: "patient-1",
+          acknowledgedAt: new Date(),
+        }),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const receipt = await new HaHService(
+      prisma,
+      {} as any,
+    ).acknowledgeMessage(
+      "episode-1",
+      "message-1",
+      "patient-1",
+      "Sudah dipahami",
+    );
+    expect(receipt.acknowledgedAt).toBeInstanceOf(Date);
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});
+
 describe("HaHService medication adherence", () => {
   it("memperbarui dosis terjadwal tanpa membuat catatan duplikat", async () => {
     const planned = {

@@ -204,5 +204,11 @@
 - Acceptance identifies the receiving contact and clinician; departure records transport identity; arrival requires a named receiver and handoff confirmation.
 - Rejected or cancelled transfers return the episode to active care, notify the team to arrange an alternative, and preserve every transition in the clinical audit trail.
 
+## Phase 2.19 — safe patient, caregiver, and clinical-team communication
+- Extended the existing episode message channel with explicit audiences so internal care-team messages are not exposed to patients or caregivers.
+- Added per-user read and acknowledgement receipts for safety-critical instructions, including an optional acknowledgement deadline.
+- Only clinical team members may request acknowledgement; senders cannot acknowledge their own instructions.
+- Urgent messages create a high-priority clinical alert and team notification instead of remaining an untracked chat message, and send/read/acknowledgement events are audited.
+
 ## Still pending for Phase 1+
 - Operator review and approval of service-catalogue wording, contact channels, legal details, and accreditation claims.

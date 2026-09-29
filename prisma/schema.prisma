@@ -152,6 +152,7 @@ model User {
   healthWorkerProfile HealthWorker? @relation("HealthWorkerAccount")
   caregiverAccesses HaHCaregiverAccess[] @relation("CaregiverUser")
   clinicalMessages HaHClinicalMessage[] @relation("ClinicalMessageSender")
+  clinicalMessageReceipts HaHClinicalMessageReceipt[] @relation("ClinicalMessageReceiptUser")
   protocolApprovals HaHClinicalProtocolApproval[] @relation("ProtocolApprover")
   breakGlassAccesses HaHBreakGlassAccess[] @relation("BreakGlassUser")
   patientBookings Booking[] @relation("BookingPatientAccount")
@@ -1339,18 +1340,40 @@ model HaHCaregiverAccess {
 }
 
 model HaHClinicalMessage {
-  id String @id @default(cuid())
-  episodeId String
-  episode HaHEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
-  senderId String
-  sender User @relation("ClinicalMessageSender", fields: [senderId], references: [id])
-  body String
-  category String @default("GENERAL")
-  priority String @default("ROUTINE")
-  attachmentUrls Json?
-  readAt DateTime?
-  createdAt DateTime @default(now())
+  id                      String   @id @default(cuid())
+  episodeId               String
+  episode                 HaHEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  senderId                String
+  sender                  User     @relation("ClinicalMessageSender", fields: [senderId], references: [id])
+  body                    String
+  category                String   @default("GENERAL")
+  priority                String   @default("ROUTINE")
+  audience                String   @default("ALL")
+  requiresAcknowledgement Boolean  @default(false)
+  acknowledgementDueAt    DateTime?
+  attachmentUrls          Json?
+  readAt                  DateTime?
+  createdAt               DateTime @default(now())
+  receipts                HaHClinicalMessageReceipt[]
+
   @@index([episodeId, createdAt])
+  @@index([requiresAcknowledgement, acknowledgementDueAt])
+}
+
+model HaHClinicalMessageReceipt {
+  id                  String             @id @default(cuid())
+  messageId           String
+  message             HaHClinicalMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User               @relation("ClinicalMessageReceiptUser", fields: [userId], references: [id], onDelete: Cascade)
+  readAt              DateTime?
+  acknowledgedAt      DateTime?
+  acknowledgementNote String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@unique([messageId, userId])
+  @@index([userId, readAt, acknowledgedAt])
 }
 
 model HaHClinicalProtocol {

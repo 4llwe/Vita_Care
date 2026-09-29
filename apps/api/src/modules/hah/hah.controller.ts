@@ -53,6 +53,7 @@ import {
   ResolveAlertDto,
   ResolveEmergencyEventDto,
   SendClinicalMessageDto,
+  AcknowledgeClinicalMessageDto,
   TransferDto,
   UpdateTransferDto,
   UpdateEquipmentStatusDto,
@@ -727,8 +728,8 @@ export class HaHController {
 
   @Get("episodes/:id/messages")
   @Roles("PATIENT", "CAREGIVER", "HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
-  messages(@Param("id") id: string) {
-    return this.hah.listMessages(id);
+  messages(@Param("id") id: string, @CurrentUser() actor: AuthActor) {
+    return this.hah.listMessages(id, actor);
   }
 
   @Post("episodes/:id/messages")
@@ -736,9 +737,9 @@ export class HaHController {
   sendMessage(
     @Param("id") id: string,
     @Body() dto: SendClinicalMessageDto,
-    @CurrentUser() u: { id: string },
+    @CurrentUser() actor: AuthActor,
   ) {
-    return this.hah.sendMessage(id, dto, u.id);
+    return this.hah.sendMessage(id, dto, actor);
   }
 
   @Get("protocols/active")
@@ -775,8 +776,23 @@ export class HaHController {
 
   @Patch("episodes/:id/messages/:messageId/read")
   @Roles("PATIENT", "CAREGIVER", "HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
-  readMessage(@Param("messageId") messageId: string) {
-    return this.hah.markMessageRead(messageId);
+  readMessage(
+    @Param("id") id: string,
+    @Param("messageId") messageId: string,
+    @CurrentUser() actor: AuthActor,
+  ) {
+    return this.hah.markMessageRead(id, messageId, actor.id);
+  }
+
+  @Patch("episodes/:id/messages/:messageId/acknowledge")
+  @Roles("PATIENT", "CAREGIVER", "HEALTH_WORKER", "DOCTOR", "NURSE", "COORDINATOR", "SUPER_ADMIN")
+  acknowledgeMessage(
+    @Param("id") id: string,
+    @Param("messageId") messageId: string,
+    @Body() dto: AcknowledgeClinicalMessageDto,
+    @CurrentUser() actor: AuthActor,
+  ) {
+    return this.hah.acknowledgeMessage(id, messageId, actor.id, dto.note);
   }
 
   @Post("protocols")
