@@ -165,6 +165,14 @@ requireText(
 const vercel = JSON.parse(read("vercel.json"));
 if (!vercel.functions?.["api/[...path].ts"])
   fail("Vercel API catch-all function is missing");
+const webVercel = JSON.parse(read("apps/web/vercel.json"));
+if (webVercel.framework !== "nextjs")
+  fail("Vercel web project must use the Next.js framework");
+if (
+  !webVercel.buildCommand?.includes("pnpm --filter web build") ||
+  webVercel.buildCommand.includes("--filter api")
+)
+  fail("Vercel web project must use the isolated web build command");
 const cronSchedules = new Map(
   (vercel.crons ?? []).map((cron) => [cron.path, cron.schedule]),
 );

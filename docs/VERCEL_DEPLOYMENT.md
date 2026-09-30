@@ -25,6 +25,7 @@ Configure the existing `vita-care-web` project:
 - Root directory: `apps/web`
 - Framework preset: Next.js
 - Include source files outside the root directory: enabled
+- Project-specific configuration: committed `apps/web/vercel.json` (prevents the root API configuration from being applied to the web project)
 - Install command: `cd ../.. && corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --frozen-lockfile`
 - Build command: `cd ../.. && pnpm --filter web build`
 - Output directory: `.next`
