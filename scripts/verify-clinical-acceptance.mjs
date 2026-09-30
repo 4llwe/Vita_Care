@@ -165,9 +165,17 @@ requireText(
 const vercel = JSON.parse(read("vercel.json"));
 if (!vercel.functions?.["api/[...path].ts"])
   fail("Vercel API catch-all function is missing");
-const cronPaths = new Set((vercel.crons ?? []).map((cron) => cron.path));
-for (const path of ["/api/cron/clinical-minute", "/api/cron/capa-daily"])
-  if (!cronPaths.has(path)) fail(`Vercel cron is missing ${path}`);
+const cronSchedules = new Map(
+  (vercel.crons ?? []).map((cron) => [cron.path, cron.schedule]),
+);
+const expectedCronSchedules = new Map([
+  ["/api/cron/clinical-minute", "0 1 * * *"],
+  ["/api/cron/capa-daily", "0 0 * * *"],
+]);
+for (const [path, schedule] of expectedCronSchedules) {
+  if (cronSchedules.get(path) !== schedule)
+    fail(`Vercel cron ${path} must use ${schedule} for the Hobby deployment`);
+}
 requireText(
   read(
     "apps/api/src/modules/serverless-cron/serverless-cron.controller.ts",

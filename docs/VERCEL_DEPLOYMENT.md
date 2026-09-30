@@ -36,12 +36,12 @@ The API `WEB_ORIGIN` must contain the approved web production origin. Add previe
 
 Vercel Cron invokes:
 
-- `/api/cron/clinical-minute` every five minutes for notification delivery, overdue clinical-alert escalation, and medication reminders;
+- `/api/cron/clinical-minute` once daily at `01:00 UTC` (`09:00 Asia/Makassar`) as a temporary Vercel Hobby fallback for notification delivery, overdue clinical-alert escalation, and medication reminders;
 - `/api/cron/capa-daily` at `00:00 UTC` (`08:00 Asia/Makassar`) for CAPA reminders.
 
 Set one independent random `CRON_SECRET` of at least 32 characters on the API project. Vercel sends it as a bearer token. Direct unauthenticated calls are rejected.
 
-The five-minute clinical schedule requires a Vercel plan that supports this cron frequency. Do not claim the alert SLA is operational on a plan that cannot run the configured schedule.
+This Hobby schedule is **not real-time clinical monitoring** and must not be presented as satisfying a five-minute alert SLA. Staff must continue active/manual monitoring and use the emergency workflow for urgent conditions. When the Vercel project is upgraded to Pro, restore `/api/cron/clinical-minute` to `*/5 * * * *`, rerun the acceptance gate, and document the operational sign-off.
 
 ## 4. Required API environment
 
