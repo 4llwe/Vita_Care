@@ -23,10 +23,12 @@ import { PublicRequestModule } from "./modules/public-request/public-request.mod
 import { MenuModule } from "./modules/menu/menu.module";
 import { UserAdminModule } from "./modules/user-admin/user-admin.module";
 import { JobQueueModule } from "./common/jobs/job-queue.module";
+import { ServerlessCronModule } from "./modules/serverless-cron/serverless-cron.module";
 
 @Module({
   imports: [
     JobQueueModule,
+    ServerlessCronModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     NotificationModule,
     HaHModule,
