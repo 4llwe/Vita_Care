@@ -165,6 +165,10 @@ requireText(
 const vercel = JSON.parse(read("vercel.json"));
 if (!vercel.functions?.["api/[...path].ts"])
   fail("Vercel API catch-all function is missing");
+if (vercel.outputDirectory !== "public")
+  fail("Vercel API output directory must be public");
+if (!fs.existsSync("public/.gitkeep"))
+  fail("Vercel API public output directory is missing");
 const webVercel = JSON.parse(read("apps/web/vercel.json"));
 if (webVercel.framework !== "nextjs")
   fail("Vercel web project must use the Next.js framework");
